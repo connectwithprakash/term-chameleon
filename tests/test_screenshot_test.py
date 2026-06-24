@@ -1,7 +1,11 @@
 import json
 
 from term_chameleon.cli import main
-from term_chameleon.screenshot_test import generate_background_artifacts, run_screenshot_test
+from term_chameleon.screenshot_test import (
+    analyze_image_file,
+    generate_background_artifacts,
+    run_screenshot_test,
+)
 
 
 def test_generate_background_artifacts(tmp_path):
@@ -23,6 +27,14 @@ def test_run_screenshot_test_writes_reports_without_capture(tmp_path):
     data = json.loads((tmp_path / "report.json").read_text())
     assert len(data["backgrounds"]) == 5
     assert data["screenshot"] is None
+    assert data["screenshot_stats"] is None
+
+
+def test_analyze_image_file_supports_ppm(tmp_path):
+    artifacts = generate_background_artifacts(tmp_path, width=8, height=8)
+    dark = next(artifact for artifact in artifacts if artifact.name == "solid-dark")
+    stats = analyze_image_file(dark.path)
+    assert stats.average_luminance < 0.01
 
 
 def test_screenshot_test_cli_without_capture(tmp_path, capsys):

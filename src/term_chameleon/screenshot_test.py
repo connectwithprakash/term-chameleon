@@ -13,6 +13,7 @@ from .images import (
     solid_image,
     write_ppm,
 )
+from .png import read_png
 from .screenshot import ScreenshotResult, capture_screen, screencapture_path
 from .watch import RISK_TO_MODE, Sample, classify_sample
 
@@ -32,6 +33,7 @@ class ScreenshotTestReport:
     output_dir: Path
     backgrounds: list[BackgroundArtifact]
     screenshot: ScreenshotResult | None
+    screenshot_stats: ImageStats | None = None
 
 
 def generate_background_artifacts(
@@ -86,10 +88,32 @@ def run_screenshot_test(
     out.mkdir(parents=True, exist_ok=True)
     artifacts = generate_background_artifacts(out, width=width, height=height)
     screenshot: ScreenshotResult | None = None
+    screenshot_stats: ImageStats | None = None
     if capture:
         screenshot = capture_screen(out / "screen.png")
-    write_report(ScreenshotTestReport(output_dir=out, backgrounds=artifacts, screenshot=screenshot))
-    return ScreenshotTestReport(output_dir=out, backgrounds=artifacts, screenshot=screenshot)
+        if screenshot.captured and screenshot.output_path is not None:
+            screenshot_stats = analyze_image_file(screenshot.output_path)
+    report = ScreenshotTestReport(
+        output_dir=out,
+        backgrounds=artifacts,
+        screenshot=screenshot,
+        screenshot_stats=screenshot_stats,
+    )
+    write_report(report)
+    return report
+
+
+def analyze_image_file(path: str | Path) -> ImageStats:
+    source = Path(path)
+    if source.suffix.lower() == ".ppm":
+        from .images import read_ppm
+
+        image = read_ppm(source)
+    elif source.suffix.lower() == ".png":
+        image = read_png(source)
+    else:
+        raise ValueError(f"unsupported image format for analysis: {source.suffix}")
+    return image_stats(image)
 
 
 def write_report(report: ScreenshotTestReport) -> tuple[Path, Path]:
@@ -110,6 +134,9 @@ def write_report(report: ScreenshotTestReport) -> tuple[Path, Path]:
                     for artifact in report.backgrounds
                 ],
                 "screenshot": _screenshot_json(report.screenshot),
+                "screenshot_stats": asdict(report.screenshot_stats)
+                if report.screenshot_stats is not None
+                else None,
                 "screencapture_available": screencapture_path() is not None,
             },
             indent=2,
@@ -143,6 +170,15 @@ def write_report(report: ScreenshotTestReport) -> tuple[Path, Path]:
                 f"- message: {report.screenshot.message}",
             ]
         )
+        if report.screenshot_stats is not None:
+            rows.extend(
+                [
+                    f"- average luminance: `{report.screenshot_stats.average_luminance:.3f}`",
+                    f"- luminance variance: `{report.screenshot_stats.luminance_variance:.3f}`",
+                    f"- min luminance: `{report.screenshot_stats.min_luminance:.3f}`",
+                    f"- max luminance: `{report.screenshot_stats.max_luminance:.3f}`",
+                ]
+            )
     md_path.write_text("\n".join(rows) + "\n", encoding="utf-8")
     return json_path, md_path
 

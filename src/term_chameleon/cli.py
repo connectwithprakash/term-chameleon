@@ -309,6 +309,11 @@ def _screenshot_test(*, output_dir: Path, capture: bool, width: int, height: int
         )
     if report.screenshot is not None:
         print(report.screenshot.message)
+        if report.screenshot_stats is not None:
+            print(
+                f"Screenshot stats: lum={report.screenshot_stats.average_luminance:.3f} "
+                f"var={report.screenshot_stats.luminance_variance:.3f}"
+            )
         if not report.screenshot.captured:
             return 1
     print("[ok] screenshot-test foundation passed")
