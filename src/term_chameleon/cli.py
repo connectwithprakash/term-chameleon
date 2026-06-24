@@ -5,6 +5,7 @@ import json
 import sys
 from pathlib import Path
 
+from .background_html import open_file, write_background_html
 from .diagnostics import diagnose
 from .fixes import fix_file
 from .install import (
@@ -93,6 +94,10 @@ def main(argv: list[str] | None = None) -> int:
     screenshot_test.add_argument("--width", type=int, default=640)
     screenshot_test.add_argument("--height", type=int, default=360)
 
+    backgrounds = sub.add_parser("background-html", help="Generate controlled HTML backgrounds")
+    backgrounds.add_argument("--output-dir", type=Path, default=Path("artifacts/background-html"))
+    backgrounds.add_argument("--open", action="store_true", dest="open_browser")
+
     args = parser.parse_args(argv)
     try:
         if args.command == "doctor":
@@ -129,6 +134,8 @@ def main(argv: list[str] | None = None) -> int:
                 width=args.width,
                 height=args.height,
             )
+        if args.command == "background-html":
+            return _background_html(output_dir=args.output_dir, open_browser=args.open_browser)
     except (ValueError, OSError, json.JSONDecodeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
@@ -317,6 +324,22 @@ def _screenshot_test(*, output_dir: Path, capture: bool, width: int, height: int
         if not report.screenshot.captured:
             return 1
     print("[ok] screenshot-test foundation passed")
+    return 0
+
+
+def _background_html(*, output_dir: Path, open_browser: bool) -> int:
+    artifacts = write_background_html(output_dir)
+    for artifact in artifacts:
+        print(f"Wrote: {artifact.path}")
+    if open_browser:
+        index = next(artifact.path for artifact in artifacts if artifact.name == "index")
+        completed = open_file(index)
+        if completed.returncode != 0:
+            message = completed.stderr or completed.stdout or "open failed"
+            print(f"error: {message.strip()}", file=sys.stderr)
+            return 1
+        print(f"Opened: {index}")
+    print("[ok] generated controlled HTML backgrounds")
     return 0
 
 
