@@ -18,7 +18,7 @@ This repository is in MVP scaffolding. Implemented now:
 - OSC color sequence generation, including tmux passthrough wrapping.
 - Dynamic watcher foundation via `watch-sim` risk classifier and hysteresis mode selector.
 - iTerm2 live-adapter script generation/probe foundation for session-local Python API validation.
-- macOS `screencapture` probe foundation for later screenshot-based visual tests.
+- macOS `screencapture` probe and screenshot-test artifact foundation for later screenshot-based visual tests.
 - Fixture tests for good and bad iTerm2 profiles.
 
 Planned later:
@@ -57,11 +57,13 @@ term-chameleon iterm-api-check
 term-chameleon iterm-live-script --preset balanced --output /tmp/term-chameleon-live.py
 ```
 
-Probe macOS screenshot availability:
+Probe macOS screenshot availability and generate controlled screenshot-test artifacts:
 
 ```bash
 term-chameleon screenshot-probe
 term-chameleon screenshot-probe --capture --output artifacts/screenshot-probe/screen.png
+term-chameleon screenshot-test --output-dir artifacts/screenshot-test
+term-chameleon screenshot-test --capture --output-dir artifacts/screenshot-test
 ```
 
 Run deterministic visual simulation:

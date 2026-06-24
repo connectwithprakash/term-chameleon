@@ -19,6 +19,7 @@ from .modes import apply_mode
 from .osc import reset_sequences, sequences_for_preset, shell_printf
 from .presets import PRESETS
 from .screenshot import probe_screenshot
+from .screenshot_test import run_screenshot_test
 from .visual import write_visual_report
 from .watch import ModeSelector, Sample
 
@@ -81,6 +82,17 @@ def main(argv: list[str] | None = None) -> int:
         "--output", type=Path, default=Path("artifacts/screenshot-probe/screen.png")
     )
 
+    screenshot_test = sub.add_parser(
+        "screenshot-test",
+        help="Generate controlled background artifacts and optionally capture a screenshot",
+    )
+    screenshot_test.add_argument(
+        "--output-dir", type=Path, default=Path("artifacts/screenshot-test")
+    )
+    screenshot_test.add_argument("--capture", action="store_true")
+    screenshot_test.add_argument("--width", type=int, default=640)
+    screenshot_test.add_argument("--height", type=int, default=360)
+
     args = parser.parse_args(argv)
     try:
         if args.command == "doctor":
@@ -110,6 +122,13 @@ def main(argv: list[str] | None = None) -> int:
             return _iterm_live_script(args.preset, output=args.output)
         if args.command == "screenshot-probe":
             return _screenshot_probe(capture=args.capture, output=args.output)
+        if args.command == "screenshot-test":
+            return _screenshot_test(
+                output_dir=args.output_dir,
+                capture=args.capture,
+                width=args.width,
+                height=args.height,
+            )
     except (ValueError, OSError, json.JSONDecodeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
@@ -274,6 +293,25 @@ def _screenshot_probe(*, capture: bool, output: Path) -> int:
         return 1
     if capture and not result.captured:
         return 1
+    return 0
+
+
+def _screenshot_test(*, output_dir: Path, capture: bool, width: int, height: int) -> int:
+    report = run_screenshot_test(output_dir, capture=capture, width=width, height=height)
+    print(f"Wrote: {report.output_dir / 'report.json'}")
+    print(f"Wrote: {report.output_dir / 'report.md'}")
+    print(f"Backgrounds: {len(report.backgrounds)}")
+    for artifact in report.backgrounds:
+        print(
+            f"- {artifact.name}: lum={artifact.stats.average_luminance:.3f} "
+            f"var={artifact.stats.luminance_variance:.3f} "
+            f"risk={artifact.risk} mode={artifact.suggested_mode}"
+        )
+    if report.screenshot is not None:
+        print(report.screenshot.message)
+        if not report.screenshot.captured:
+            return 1
+    print("[ok] screenshot-test foundation passed")
     return 0
 
 

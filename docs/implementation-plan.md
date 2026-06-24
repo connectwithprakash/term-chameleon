@@ -66,7 +66,7 @@ Implement:
 
 ## Milestone 4: visual test harness
 
-Current implementation is a deterministic pre-screenshot simulation: controlled solid-background blending, ANSI pattern artifact, JSON/Markdown reports, and WCAG contrast checks. The full screenshot harness remains planned.
+Current implementation is a deterministic pre-screenshot simulation: controlled solid-background blending, ANSI pattern artifact, JSON/Markdown reports, and WCAG contrast checks. The screenshot-test foundation now also generates controlled PPM background artifacts, computes luminance/variance/risk classifications, and can optionally capture a real macOS screenshot.
 
 Next full harness work:
 
