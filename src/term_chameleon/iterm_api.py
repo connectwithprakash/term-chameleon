@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -15,17 +16,22 @@ class ItermApiEnvironment:
     app_installed: bool
     python_package_available: bool
     app_paths_checked: tuple[str, ...]
+    python_executable: str
+    missing_setters: tuple[str, ...] = ()
 
     @property
     def ready_for_live_probe(self) -> bool:
-        return self.app_installed and self.python_package_available
+        return self.app_installed and self.python_package_available and not self.missing_setters
 
 
 def check_environment() -> ItermApiEnvironment:
+    package_available = importlib.util.find_spec("iterm2") is not None
     return ItermApiEnvironment(
         app_installed=any(path.exists() for path in ITERM_APP_PATHS),
-        python_package_available=importlib.util.find_spec("iterm2") is not None,
+        python_package_available=package_available,
         app_paths_checked=tuple(str(path) for path in ITERM_APP_PATHS),
+        python_executable=sys.executable,
+        missing_setters=missing_live_adapter_setters() if package_available else (),
     )
 
 
@@ -87,8 +93,31 @@ def write_live_adapter_script(path: str | Path, *, preset_name: str = "balanced"
     return target
 
 
+def live_adapter_setters() -> tuple[str, ...]:
+    return tuple(setter for setter, _value in _setter_mappings(get_preset("balanced")))
+
+
+def missing_live_adapter_setters() -> tuple[str, ...]:
+    import iterm2  # type: ignore[import-not-found]
+
+    change = iterm2.LocalWriteOnlyProfile()
+    return tuple(
+        setter for setter in live_adapter_setters() if getattr(change, setter, None) is None
+    )
+
+
 def _color_assignment_lines(preset: Preset) -> str:
-    mappings = [
+    lines = []
+    for setter, value in _setter_mappings(preset):
+        if isinstance(value, str):
+            lines.append(f'    maybe_set(change, "{setter}", color("{value}"))')
+        else:
+            lines.append(f'    maybe_set(change, "{setter}", {value!r})')
+    return "\n".join(lines)
+
+
+def _setter_mappings(preset: Preset) -> list[tuple[str, str | float | bool]]:
+    return [
         ("set_background_color", preset.background.to_hex()),
         ("set_foreground_color", preset.foreground.to_hex()),
         ("set_bold_color", preset.bold.to_hex()),
@@ -99,12 +128,8 @@ def _color_assignment_lines(preset: Preset) -> str:
         ("set_ansi_7_color", preset.ansi_white.to_hex()),
         ("set_ansi_8_color", preset.ansi_bright_black.to_hex()),
         ("set_ansi_15_color", preset.ansi_bright_white.to_hex()),
+        ("set_transparency", preset.transparency),
+        ("set_blur", preset.blur),
+        ("set_blur_radius", preset.blur_radius),
+        ("set_minimum_contrast", preset.minimum_contrast),
     ]
-    lines = []
-    for setter, hex_value in mappings:
-        lines.append(f'    maybe_set(change, "{setter}", color("{hex_value}"))')
-    lines.append(f'    maybe_set(change, "set_transparency", {preset.transparency!r})')
-    lines.append(f'    maybe_set(change, "set_blur", {preset.blur!r})')
-    lines.append(f'    maybe_set(change, "set_blur_radius", {preset.blur_radius!r})')
-    lines.append(f'    maybe_set(change, "set_minimum_contrast", {preset.minimum_contrast!r})')
-    return "\n".join(lines)

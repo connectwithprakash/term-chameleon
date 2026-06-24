@@ -18,17 +18,16 @@ This repository is in MVP scaffolding. Implemented now:
 - OSC color sequence generation, including tmux passthrough wrapping.
 - Dynamic watcher foundation via `watch-sim` risk classifier and hysteresis mode selector.
 - iTerm2 live-adapter script generation/probe foundation for session-local Python API validation.
-- macOS `screencapture` probe and screenshot-test artifact foundation for later screenshot-based visual tests.
+- Screen/image sampling one-shot adaptation via `sample` and `adapt-once`.
+- Deterministic E2E staging bundle that combines controlled backgrounds, ANSI pattern artifacts, visual simulation, screenshot capture, and screenshot pixel analysis.
+- macOS `screencapture` probe and screenshot-test artifact foundation for screenshot-based visual tests.
 - Fixture tests for good and bad iTerm2 profiles.
 
 Planned later:
 
-- Screenshot-based visual test harness with controlled backgrounds and measured text pixels.
-- Live execution of the generated iTerm2 API adapter after the `iterm2` Python package/permissions are available.
-- Heuristic and screen-sampling watcher daemon.
-- iTerm2 Python AutoLaunch daemon using session-local profile mutation.
-- OSC backend and tmux compatibility checks.
-- Screen-sampling adaptive watcher.
+- Live execution of the generated iTerm2 API adapter from inside iTerm2 after user grants any required automation/Python API permissions.
+- Full window orchestration: automatically arrange controlled browser background + iTerm2 pattern window and measure actual text pixels.
+- Long-running daemon packaging for continuous adaptation.
 
 ## CLI examples
 
@@ -66,6 +65,9 @@ term-chameleon screenshot-test --output-dir artifacts/screenshot-test
 term-chameleon screenshot-test --capture --output-dir artifacts/screenshot-test
 term-chameleon background-html --output-dir artifacts/background-html
 term-chameleon pattern-script --output-dir artifacts/pattern-script
+term-chameleon e2e-stage tests/fixtures/iterm/good-dark-glass.json --output-dir artifacts/e2e-stage
+term-chameleon sample --screen --output artifacts/adapt/screen.png
+term-chameleon adapt-once tests/fixtures/iterm/good-dark-glass.json --screen --dry-run
 ```
 
 Run deterministic visual simulation:

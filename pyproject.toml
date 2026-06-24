@@ -24,6 +24,7 @@ dependencies = []
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "ruff>=0.5"]
+iterm = ["iterm2>=2.9"]
 visual = ["pillow>=10.0"]
 
 [project.scripts]

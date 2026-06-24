@@ -5,8 +5,15 @@ import json
 import sys
 from pathlib import Path
 
+from .adapt import (
+    adapt_profile_from_image,
+    adapt_profile_from_screen,
+    decide_from_image,
+    decide_from_screen,
+)
 from .background_html import open_file, write_background_html
 from .diagnostics import diagnose
+from .e2e_stage import run_e2e_stage
 from .fixes import fix_file
 from .install import (
     DEFAULT_AUTOLAUNCH_DIR,
@@ -14,7 +21,12 @@ from .install import (
     install_autolaunch_script,
     install_profile,
 )
-from .iterm_api import check_environment, live_adapter_script, write_live_adapter_script
+from .iterm_api import (
+    check_environment,
+    live_adapter_script,
+    live_adapter_setters,
+    write_live_adapter_script,
+)
 from .iterm_profile import load_profile, loads_document
 from .modes import apply_mode
 from .osc import reset_sequences, sequences_for_preset, shell_printf
@@ -102,6 +114,30 @@ def main(argv: list[str] | None = None) -> int:
     pattern = sub.add_parser("pattern-script", help="Write ANSI terminal pattern artifacts")
     pattern.add_argument("--output-dir", type=Path, default=Path("artifacts/pattern-script"))
 
+    e2e = sub.add_parser("e2e-stage", help="Run the deterministic end-to-end staging bundle")
+    e2e.add_argument("profile", type=Path)
+    e2e.add_argument("--output-dir", type=Path, default=Path("artifacts/e2e-stage"))
+    e2e.add_argument("--capture", action="store_true")
+    e2e.add_argument("--width", type=int, default=640)
+    e2e.add_argument("--height", type=int, default=360)
+
+    sample = sub.add_parser("sample", help="Sample an image or live screen and suggest a mode")
+    sample_source = sample.add_mutually_exclusive_group(required=True)
+    sample_source.add_argument("--image", type=Path)
+    sample_source.add_argument("--screen", action="store_true")
+    sample.add_argument("--output", type=Path, default=Path("artifacts/adapt/screen.png"))
+
+    adapt = sub.add_parser(
+        "adapt-once", help="Sample image/screen and apply suggested mode to a profile"
+    )
+    adapt.add_argument("profile", type=Path)
+    adapt_source = adapt.add_mutually_exclusive_group(required=True)
+    adapt_source.add_argument("--image", type=Path)
+    adapt_source.add_argument("--screen", action="store_true")
+    adapt.add_argument("--output", type=Path, default=Path("artifacts/adapt/screen.png"))
+    adapt.add_argument("--dry-run", action="store_true")
+    adapt.add_argument("--yes", action="store_true")
+
     args = parser.parse_args(argv)
     try:
         if args.command == "doctor":
@@ -142,7 +178,26 @@ def main(argv: list[str] | None = None) -> int:
             return _background_html(output_dir=args.output_dir, open_browser=args.open_browser)
         if args.command == "pattern-script":
             return _pattern_script(output_dir=args.output_dir)
-    except (ValueError, OSError, json.JSONDecodeError) as exc:
+        if args.command == "e2e-stage":
+            return _e2e_stage(
+                profile=args.profile,
+                output_dir=args.output_dir,
+                capture=args.capture,
+                width=args.width,
+                height=args.height,
+            )
+        if args.command == "sample":
+            return _sample(image=args.image, screen=args.screen, output=args.output)
+        if args.command == "adapt-once":
+            return _adapt_once(
+                profile=args.profile,
+                image=args.image,
+                screen=args.screen,
+                output=args.output,
+                dry_run=args.dry_run,
+                yes=args.yes,
+            )
+    except (ValueError, OSError, json.JSONDecodeError, RuntimeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
     parser.error("unknown command")
@@ -275,12 +330,24 @@ def _iterm_api_check() -> int:
     env = check_environment()
     print(f"iTerm2 app installed: {'yes' if env.app_installed else 'no'}")
     print(f"iTerm2 Python package available: {'yes' if env.python_package_available else 'no'}")
+    print(f"Python executable: {env.python_executable}")
     print("app paths checked:")
     for path in env.app_paths_checked:
         print(f"- {path}")
+    print("required LocalWriteOnlyProfile setters:")
+    for setter in live_adapter_setters():
+        if not env.python_package_available:
+            status = "skipped"
+        else:
+            status = "missing" if setter in env.missing_setters else "ok"
+        print(f"- {setter}: {status}")
     if env.ready_for_live_probe:
         print("[ok] ready for live iTerm2 API probe")
         return 0
+    if not env.python_package_available:
+        print("[hint] install iTerm support with: uv sync --extra iterm")
+    if env.missing_setters:
+        print("[warn] installed iterm2 package is missing required setter(s)")
     print("[warn] live iTerm2 API probe is not ready on this Python environment")
     return 1
 
@@ -355,6 +422,66 @@ def _pattern_script(*, output_dir: Path) -> int:
     print(f"Wrote: {script}")
     print("[ok] generated ANSI terminal pattern artifacts")
     return 0
+
+
+def _e2e_stage(*, profile: Path, output_dir: Path, capture: bool, width: int, height: int) -> int:
+    report = run_e2e_stage(profile, output_dir, capture=capture, width=width, height=height)
+    print(f"Wrote: {report.output_dir / 'e2e-stage-report.json'}")
+    print(f"Wrote: {report.output_dir / 'e2e-stage-report.md'}")
+    print(f"Background files: {len(report.background_files)}")
+    print(f"Pattern files: {len(report.pattern_files)}")
+    print(f"Visual report: {report.visual_report_json}")
+    print(f"Screenshot report: {report.screenshot_report_json}")
+    print(f"Screenshot captured: {report.screenshot_captured}")
+    print("[ok] e2e staging bundle passed")
+    return 0
+
+
+def _sample(*, image: Path | None, screen: bool, output: Path) -> int:
+    decision = decide_from_screen(output) if screen else decide_from_image(_require_path(image))
+    _print_decision(decision)
+    return 0
+
+
+def _adapt_once(
+    *,
+    profile: Path,
+    image: Path | None,
+    screen: bool,
+    output: Path,
+    dry_run: bool,
+    yes: bool,
+) -> int:
+    if not dry_run and not yes:
+        print("Refusing to write without --yes. Use --dry-run to preview.", file=sys.stderr)
+        return 2
+    decision = (
+        adapt_profile_from_screen(profile, output, dry_run=dry_run, yes=yes)
+        if screen
+        else adapt_profile_from_image(_require_path(image), profile, dry_run=dry_run, yes=yes)
+    )
+    _print_decision(decision)
+    if decision.mode_result is not None:
+        changes, remaining = decision.mode_result
+        print("Planned changes:" if dry_run else "Applied changes:")
+        _print_changes(changes)
+        return _print_remaining_failures(remaining, "adapted profile passes failure-level checks")
+    return 0
+
+
+def _print_decision(decision) -> None:
+    print(f"Source: {decision.source}")
+    print(f"Average luminance: {decision.average_luminance:.3f}")
+    print(f"Luminance variance: {decision.luminance_variance:.3f}")
+    print(f"Risk: {decision.risk}")
+    print(f"Suggested mode: {decision.suggested_mode}")
+    print(f"Reason: {decision.reason}")
+
+
+def _require_path(path: Path | None) -> Path:
+    if path is None:
+        raise ValueError("image path is required")
+    return path
 
 
 def _parse_sample(raw: str) -> Sample:
