@@ -13,8 +13,10 @@ This repository is in MVP scaffolding. Implemented now:
 - WCAG contrast calculations.
 - Static diagnostics for common glass-terminal readability failures.
 - Conservative static fixer with dry-run, backups, deterministic JSON, and explainable changes.
-- iTerm2 Dynamic Profile balanced preset install flow.
-- Deterministic visual contrast simulation over controlled backgrounds.
+- iTerm2 Dynamic Profile preset install flow, including optional AutoLaunch default-profile script.
+- Manual readability mode switching for profile JSON files.
+- OSC color sequence generation, including tmux passthrough wrapping.
+- Deterministic visual contrast simulation over controlled backgrounds plus ANSI pattern artifacts.
 - Fixture tests for good and bad iTerm2 profiles.
 
 Planned later:
@@ -30,6 +32,25 @@ Install a balanced preset into a target directory:
 
 ```bash
 term-chameleon install --target-dir /tmp/iterm-dynamic-profiles --name "Adaptive Glass"
+```
+
+Install and generate an iTerm2 AutoLaunch script that makes the profile default:
+
+```bash
+term-chameleon install --make-default --name "Adaptive Glass"
+```
+
+Apply a manual readability mode to a profile JSON file:
+
+```bash
+term-chameleon mode bright-safe ~/Library/Application\ Support/iTerm2/DynamicProfiles/adaptive-glass.json --dry-run
+```
+
+Print OSC color updates for the current terminal session:
+
+```bash
+term-chameleon osc apply bright-safe --shell
+term-chameleon osc reset --tmux --shell
 ```
 
 Run deterministic visual simulation:

@@ -30,6 +30,26 @@ CONTROLLED_BACKGROUNDS = {
     "warm-light": Color.from_hex("#F2E8D5"),
 }
 
+ANSI_TEST_PATTERN = """\
+Term Chameleon ANSI Visual Pattern
+normal: The quick brown fox 0123456789
+\033[1mbold: The quick brown fox 0123456789\033[0m
+\033[2mdim: The quick brown fox 0123456789\033[0m
+\033[30mansi-0 black: The quick brown fox 0123456789\033[0m
+\033[90mansi-8 bright black: The quick brown fox 0123456789\033[0m
+\033[37mansi-7 white: The quick brown fox 0123456789\033[0m
+\033[97mansi-15 bright white: The quick brown fox 0123456789\033[0m
+\033[31mred\033[0m \033[32mgreen\033[0m \033[34mblue\033[0m
+\033[35mmagenta\033[0m \033[36mcyan\033[0m
+"""
+
+
+def write_ansi_pattern(path: str | Path) -> Path:
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(ANSI_TEST_PATTERN, encoding="utf-8")
+    return target
+
 
 def simulate_visual_checks(profile: ItermProfile) -> list[VisualCheck]:
     terminal_bg = profile.background or Color.from_hex("#000000")
@@ -72,6 +92,8 @@ def write_visual_report(
     out.mkdir(parents=True, exist_ok=True)
     json_path = out / "report.json"
     md_path = out / "report.md"
+    pattern_path = out / "ansi-pattern.txt"
+    write_ansi_pattern(pattern_path)
     json_path.write_text(
         json.dumps([asdict(c) | {"passed": c.passed} for c in checks], indent=2) + "\n",
         encoding="utf-8",
@@ -81,6 +103,8 @@ def write_visual_report(
         "",
         "This is a deterministic pre-screenshot visual risk simulation. It models the terminal "
         "background blended over controlled solid backgrounds and computes WCAG contrast.",
+        "",
+        f"ANSI test pattern artifact: `{pattern_path.name}`",
         "",
         "| Background | Style | FG | Effective BG | Contrast | Threshold | Result |",
         "|---|---|---:|---:|---:|---:|---|",

@@ -1,0 +1,56 @@
+from __future__ import annotations
+
+import shutil
+from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
+
+from .diagnostics import diagnose
+from .iterm_profile import dumps_document, load_profile
+from .presets import apply_preset_to_profile_dict, get_preset
+
+
+@dataclass(frozen=True)
+class ModeChange:
+    key: str
+    before: str
+    after: str
+
+
+def apply_mode(
+    path: str | Path, mode: str, *, dry_run: bool, yes: bool
+) -> tuple[list[ModeChange], list]:
+    profile = load_profile(path)
+    profile_dict = profile.profile
+    before = dict(profile_dict)
+    apply_preset_to_profile_dict(profile_dict, get_preset(mode))
+    changes = [
+        _diff_value(key, before.get(key, "<unset>"), profile_dict[key])
+        for key in sorted(profile_dict)
+        if before.get(key) != profile_dict[key]
+    ]
+    remaining = diagnose(profile)
+    if dry_run:
+        return changes, remaining
+    if not yes:
+        raise ValueError("refusing to write without --yes or --dry-run")
+    target = Path(path)
+    backup = target.with_name(target.name + ".backup." + datetime.now().strftime("%Y%m%dT%H%M%S"))
+    shutil.copy2(target, backup)
+    target.write_text(dumps_document(profile.document), encoding="utf-8")
+    return changes, remaining
+
+
+def _diff_value(key: str, before, after) -> ModeChange:
+    return ModeChange(key=key, before=_fmt(before), after=_fmt(after))
+
+
+def _fmt(value) -> str:
+    if isinstance(value, dict):
+        from .color import Color
+
+        try:
+            return Color.from_iterm_dict(value).to_hex()
+        except Exception:
+            return "<color>"
+    return repr(value)
