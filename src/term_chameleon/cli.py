@@ -18,6 +18,7 @@ from .modes import apply_mode
 from .osc import reset_sequences, sequences_for_preset, shell_printf
 from .presets import PRESETS
 from .visual import write_visual_report
+from .watch import ModeSelector, Sample
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -56,6 +57,14 @@ def main(argv: list[str] | None = None) -> int:
     visual.add_argument("profile", type=Path)
     visual.add_argument("--output-dir", type=Path, default=Path("artifacts/visual-test"))
 
+    watch_sim = sub.add_parser("watch-sim", help="Simulate dynamic mode selection from samples")
+    watch_sim.add_argument(
+        "samples",
+        nargs="+",
+        help="Samples as luminance or luminance:variance, e.g. 0.2 0.8 0.5:0.12",
+    )
+    watch_sim.add_argument("--stable", type=int, default=3)
+
     args = parser.parse_args(argv)
     try:
         if args.command == "doctor":
@@ -77,6 +86,8 @@ def main(argv: list[str] | None = None) -> int:
             return _osc(args.action, args.preset, tmux=args.tmux, shell=args.shell)
         if args.command == "visual-test":
             return _visual_test(args.profile, args.output_dir)
+        if args.command == "watch-sim":
+            return _watch_sim(args.samples, stable=args.stable)
     except (ValueError, OSError, json.JSONDecodeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
@@ -191,6 +202,26 @@ def _visual_test(profile: Path, output_dir: Path) -> int:
         return 1
     print("[ok] visual contrast simulation passed")
     return 0
+
+
+def _watch_sim(samples: list[str], *, stable: int) -> int:
+    selector = ModeSelector(stable_samples_required=stable)
+    for index, raw in enumerate(samples, start=1):
+        sample = _parse_sample(raw)
+        mode, classification, switched = selector.observe(sample)
+        marker = "switch" if switched else "hold"
+        print(
+            f"{index}: luminance={sample.luminance:.2f} variance={sample.variance:.2f} "
+            f"risk={classification.risk} mode={mode} {marker} reason={classification.reason}"
+        )
+    return 0
+
+
+def _parse_sample(raw: str) -> Sample:
+    if ":" in raw:
+        luminance, variance = raw.split(":", 1)
+        return Sample(float(luminance), float(variance))
+    return Sample(float(raw), 0.0)
 
 
 def _print_changes(changes) -> None:

@@ -68,15 +68,19 @@ Implement:
 
 Implement controlled background windows, terminal test pattern, screenshot capture, and contrast report.
 
-## Milestone 5: dynamic prototypes
+## Milestone 5: dynamic watcher foundation
 
-Order:
+Implemented foundation:
 
-1. Manual mode switching.
+- `watch.py` risk classifier.
+- hysteresis `ModeSelector`.
+- deterministic CLI simulation: `term-chameleon watch-sim`.
+
+Next live watcher order:
+
+1. Heuristic watcher using macOS appearance and profile transparency.
 2. iTerm2 Python API session-local mutation.
-3. Heuristic watcher.
-4. Screen-sampling watcher.
-5. OSC backend.
-6. tmux support.
+3. Screen-sampling watcher.
+4. OSC/tmux live backend.
 
-Do not start this until static doctor/fixer is solid.
+Do not treat `watch-sim` as a live daemon; it is the deterministic testable core.

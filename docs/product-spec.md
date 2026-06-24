@@ -67,13 +67,13 @@ It models controlled solid backgrounds, writes an ANSI pattern artifact, and com
 
 ### Dynamic watcher
 
-Planned:
+Foundation command for deterministic mode-selection simulation:
 
 ```bash
-term-chameleon watch
+term-chameleon watch-sim 0.2 0.8 0.8 0.8 0.5:0.12
 ```
 
-Starts with mode switching and eventually screen-sampling background-aware adaptation.
+This exercises the risk classifier and hysteresis mode selector. A live watcher is planned next and will start with heuristics before screen sampling.
 
 ## Adaptation modes
 
