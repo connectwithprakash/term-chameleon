@@ -65,6 +65,7 @@ term-chameleon screenshot-probe --capture --output artifacts/screenshot-probe/sc
 term-chameleon screenshot-test --output-dir artifacts/screenshot-test
 term-chameleon screenshot-test --capture --output-dir artifacts/screenshot-test
 term-chameleon background-html --output-dir artifacts/background-html
+term-chameleon pattern-script --output-dir artifacts/pattern-script
 ```
 
 Run deterministic visual simulation:

@@ -21,6 +21,7 @@ from .osc import reset_sequences, sequences_for_preset, shell_printf
 from .presets import PRESETS
 from .screenshot import probe_screenshot
 from .screenshot_test import run_screenshot_test
+from .terminal_pattern import write_pattern_bundle
 from .visual import write_visual_report
 from .watch import ModeSelector, Sample
 
@@ -98,6 +99,9 @@ def main(argv: list[str] | None = None) -> int:
     backgrounds.add_argument("--output-dir", type=Path, default=Path("artifacts/background-html"))
     backgrounds.add_argument("--open", action="store_true", dest="open_browser")
 
+    pattern = sub.add_parser("pattern-script", help="Write ANSI terminal pattern artifacts")
+    pattern.add_argument("--output-dir", type=Path, default=Path("artifacts/pattern-script"))
+
     args = parser.parse_args(argv)
     try:
         if args.command == "doctor":
@@ -136,6 +140,8 @@ def main(argv: list[str] | None = None) -> int:
             )
         if args.command == "background-html":
             return _background_html(output_dir=args.output_dir, open_browser=args.open_browser)
+        if args.command == "pattern-script":
+            return _pattern_script(output_dir=args.output_dir)
     except (ValueError, OSError, json.JSONDecodeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
@@ -340,6 +346,14 @@ def _background_html(*, output_dir: Path, open_browser: bool) -> int:
             return 1
         print(f"Opened: {index}")
     print("[ok] generated controlled HTML backgrounds")
+    return 0
+
+
+def _pattern_script(*, output_dir: Path) -> int:
+    pattern, script = write_pattern_bundle(output_dir)
+    print(f"Wrote: {pattern}")
+    print(f"Wrote: {script}")
+    print("[ok] generated ANSI terminal pattern artifacts")
     return 0
 
 
