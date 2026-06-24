@@ -92,6 +92,7 @@ Implemented:
 Implemented:
 
 - `term-chameleon iterm-api-check` reports iTerm2.app, `iterm2` Python package availability, Python executable, and required `LocalWriteOnlyProfile` setter readiness.
+- `term-chameleon iterm-connect-probe` attempts an actual live Python API connection and reports the permission/runtime blocker clearly.
 - `term-chameleon iterm-live-script` generates a conservative session-local adapter script using `LocalWriteOnlyProfile` and `session.async_set_profile_properties`.
 - Optional package extra: `uv sync --extra iterm`.
 - `term-chameleon screenshot-probe` checks macOS `screencapture` availability and can attempt a real capture.
@@ -101,6 +102,7 @@ Observed local state:
 - iTerm2.app is installed.
 - `uv sync --extra iterm` installs `iterm2==2.20` successfully.
 - Required `LocalWriteOnlyProfile` setters are present in that package.
+- The live connection probe currently reports that iTerm2's Python API is not reachable until iTerm2 is running and Python API support is enabled.
 - `screencapture` works in the current session.
 
 Remaining live iTerm2 work:

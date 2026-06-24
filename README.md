@@ -53,6 +53,7 @@ Check iTerm2 Python API readiness and generate a conservative session-local adap
 
 ```bash
 term-chameleon iterm-api-check
+term-chameleon iterm-connect-probe
 term-chameleon iterm-live-script --preset balanced --output /tmp/term-chameleon-live.py
 ```
 

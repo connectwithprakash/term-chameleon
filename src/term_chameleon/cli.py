@@ -27,6 +27,7 @@ from .iterm_api import (
     live_adapter_setters,
     write_live_adapter_script,
 )
+from .iterm_connection import probe_iterm_connection
 from .iterm_profile import load_profile, loads_document
 from .modes import apply_mode
 from .osc import reset_sequences, sequences_for_preset, shell_printf
@@ -83,6 +84,7 @@ def main(argv: list[str] | None = None) -> int:
     watch_sim.add_argument("--stable", type=int, default=3)
 
     sub.add_parser("iterm-api-check", help="Check local iTerm2 Python API readiness")
+    sub.add_parser("iterm-connect-probe", help="Attempt to connect to the live iTerm2 Python API")
 
     iterm_script = sub.add_parser(
         "iterm-live-script", help="Generate a conservative iTerm2 session-local adapter script"
@@ -163,6 +165,8 @@ def main(argv: list[str] | None = None) -> int:
             return _watch_sim(args.samples, stable=args.stable)
         if args.command == "iterm-api-check":
             return _iterm_api_check()
+        if args.command == "iterm-connect-probe":
+            return _iterm_connect_probe()
         if args.command == "iterm-live-script":
             return _iterm_live_script(args.preset, output=args.output)
         if args.command == "screenshot-probe":
@@ -362,6 +366,17 @@ def _iterm_live_script(preset: str, *, output: Path | None) -> int:
         print(f"Wrote: {target}")
     print("[ok] generated iTerm2 live adapter script compiles")
     return 0
+
+
+def _iterm_connect_probe() -> int:
+    result = probe_iterm_connection()
+    print(result.message)
+    if result.connected:
+        print("[ok] connected to live iTerm2 Python API")
+        return 0
+    print("[warn] could not connect to live iTerm2 Python API")
+    print("[hint] start iTerm2 and enable Preferences > General > Magic > Python API")
+    return 1
 
 
 def _screenshot_probe(*, capture: bool, output: Path) -> int:
