@@ -57,13 +57,13 @@ Installs iTerm2 Dynamic Profile JSON under:
 
 ### Visual test harness
 
-Planned:
+Runs the current deterministic pre-screenshot visual simulation:
 
 ```bash
-term-chameleon visual-test
+term-chameleon visual-test <profile.json>
 ```
 
-Creates controlled backgrounds, renders ANSI test patterns, captures screenshots, and computes contrast metrics.
+It models controlled solid backgrounds, writes an ANSI pattern artifact, and computes WCAG contrast metrics. A later screenshot harness will create controlled windows, open iTerm2, capture screenshots, and measure text pixels.
 
 ### Dynamic watcher
 

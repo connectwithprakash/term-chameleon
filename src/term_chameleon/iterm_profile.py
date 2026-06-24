@@ -75,6 +75,11 @@ def loads_document(text: str, path: Path | None = None) -> ItermProfile:
     profiles = document.get("Profiles")
     if not isinstance(profiles, list) or not profiles:
         raise ValueError("iTerm2 Dynamic Profile JSON must contain non-empty Profiles list")
+    if len(profiles) != 1:
+        raise ValueError(
+            "this MVP intentionally supports exactly one profile per Dynamic Profile JSON; "
+            f"found {len(profiles)} profiles"
+        )
     profile = profiles[0]
     if not isinstance(profile, dict):
         raise ValueError("first profile must be an object")

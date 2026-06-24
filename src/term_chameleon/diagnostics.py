@@ -5,6 +5,7 @@ from typing import Literal
 
 from .contrast import contrast_ratio, format_ratio
 from .iterm_profile import ItermProfile
+from .presets import COLOR_FIELD_MAP
 
 Severity = Literal["ok", "info", "warn", "fail"]
 
@@ -50,7 +51,7 @@ def diagnose(profile: ItermProfile) -> list[Diagnostic]:
 
     separate = p.get("Use Separate Colors for Light and Dark Mode")
     drift_keys = []
-    for base_key in ["Background Color", "Foreground Color", "Bold Color", "Selected Text Color"]:
+    for base_key in COLOR_FIELD_MAP:
         base = profile.color(base_key)
         if base is None:
             continue

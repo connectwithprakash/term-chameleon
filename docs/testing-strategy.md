@@ -9,26 +9,33 @@ Term Chameleon should be verifiable without manual supervision for objective cor
 1. Unit tests for colors, contrast, profile parsing, diagnostics, fixes, and mode selection.
 2. CLI tests with fixture profiles.
 3. Integration tests for iTerm2 Dynamic Profile file installation and AutoLaunch script compilation.
-4. Visual tests with controlled backgrounds, terminal patterns, screenshots, and contrast metrics.
+4. Visual tests in two layers: deterministic profile simulation first, screenshot/pixel tests later.
 5. Dynamic watcher E2E tests with controlled background changes and hysteresis assertions.
 
 ## Visual test design
 
-Planned command:
+Current command:
 
 ```bash
-term-chameleon visual-test
+term-chameleon visual-test <profile.json>
 ```
 
-The harness should:
+The current harness is a deterministic pre-screenshot simulation. It:
+
+1. Models the terminal background blended over controlled solid backgrounds.
+2. Generates an ANSI terminal test pattern artifact.
+3. Computes WCAG contrast for normal, bold, ANSI black, bright black, white, and bright white.
+4. Emits JSON and Markdown reports.
+
+Planned screenshot harness:
 
 1. Create controlled backgrounds: dark, light, gray, checkerboard, gradient.
 2. Open iTerm2 with target profile.
-3. Render a known ANSI test pattern.
+3. Render the ANSI test pattern.
 4. Capture screenshots.
 5. Locate known text rows or markers.
 6. Measure foreground/background contrast with WCAG and later APCA.
-7. Emit artifacts and a pass/fail report.
+7. Emit PNG artifacts and a pass/fail report.
 
 Text styles to test:
 
@@ -49,7 +56,8 @@ Artifacts:
 ```text
 artifacts/visual-test/report.json
 artifacts/visual-test/report.md
-artifacts/visual-test/*.png
+artifacts/visual-test/ansi-pattern.txt
+artifacts/visual-test/*.png  # planned screenshot harness
 ```
 
 ## Dynamic E2E design

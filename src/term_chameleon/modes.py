@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import shutil
 from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
 
 from .diagnostics import diagnose
 from .iterm_profile import dumps_document, load_profile
 from .presets import apply_preset_to_profile_dict, get_preset
+from .safe_io import atomic_write_text, backup_file
 
 
 @dataclass(frozen=True)
@@ -35,9 +34,8 @@ def apply_mode(
     if not yes:
         raise ValueError("refusing to write without --yes or --dry-run")
     target = Path(path)
-    backup = target.with_name(target.name + ".backup." + datetime.now().strftime("%Y%m%dT%H%M%S"))
-    shutil.copy2(target, backup)
-    target.write_text(dumps_document(profile.document), encoding="utf-8")
+    backup_file(target)
+    atomic_write_text(target, dumps_document(profile.document))
     return changes, remaining
 
 

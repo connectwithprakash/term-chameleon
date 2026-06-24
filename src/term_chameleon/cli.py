@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -56,25 +57,29 @@ def main(argv: list[str] | None = None) -> int:
     visual.add_argument("--output-dir", type=Path, default=Path("artifacts/visual-test"))
 
     args = parser.parse_args(argv)
-    if args.command == "doctor":
-        return _doctor(args.profile)
-    if args.command == "fix":
-        return _fix(args.profile, dry_run=args.dry_run, yes=args.yes)
-    if args.command == "install":
-        return _install(
-            args.target_dir,
-            args.autolaunch_dir,
-            name=args.name,
-            preset=args.preset,
-            make_default=args.make_default,
-            dry_run=args.dry_run,
-        )
-    if args.command == "mode":
-        return _mode(args.profile, args.preset, dry_run=args.dry_run, yes=args.yes)
-    if args.command == "osc":
-        return _osc(args.action, args.preset, tmux=args.tmux, shell=args.shell)
-    if args.command == "visual-test":
-        return _visual_test(args.profile, args.output_dir)
+    try:
+        if args.command == "doctor":
+            return _doctor(args.profile)
+        if args.command == "fix":
+            return _fix(args.profile, dry_run=args.dry_run, yes=args.yes)
+        if args.command == "install":
+            return _install(
+                args.target_dir,
+                args.autolaunch_dir,
+                name=args.name,
+                preset=args.preset,
+                make_default=args.make_default,
+                dry_run=args.dry_run,
+            )
+        if args.command == "mode":
+            return _mode(args.profile, args.preset, dry_run=args.dry_run, yes=args.yes)
+        if args.command == "osc":
+            return _osc(args.action, args.preset, tmux=args.tmux, shell=args.shell)
+        if args.command == "visual-test":
+            return _visual_test(args.profile, args.output_dir)
+    except (ValueError, OSError, json.JSONDecodeError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
     parser.error("unknown command")
     return 2
 

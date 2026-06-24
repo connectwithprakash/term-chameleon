@@ -26,6 +26,17 @@ def test_detects_bad_ansi_black():
     assert "LOW_ANSI_BLACK_CONTRAST" in codes("bad-ansi-black.json")
 
 
+def test_detects_ansi_light_variant_drift(tmp_path):
+    import json
+
+    source = json.loads((FIXTURES / "good-dark-glass.json").read_text())
+    source["Profiles"][0]["Ansi 0 Color (Light)"] = source["Profiles"][0]["Ansi 15 Color"]
+    target = tmp_path / "ansi-drift.json"
+    target.write_text(json.dumps(source))
+    profile = load_profile(target)
+    assert "ITERM_LIGHT_DARK_DRIFT" in {d.code for d in diagnose(profile)}
+
+
 def test_balanced_fix_removes_failures():
     profile = load_profile(FIXTURES / "bad-light-variant.json")
     changes = apply_balanced_fix(profile)

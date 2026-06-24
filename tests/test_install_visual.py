@@ -6,7 +6,7 @@ from term_chameleon.cli import main
 from term_chameleon.install import install_autolaunch_script, install_balanced_profile
 from term_chameleon.iterm_profile import load_profile, loads_document
 from term_chameleon.modes import apply_mode
-from term_chameleon.osc import sequences_for_preset, shell_printf, tmux_wrap
+from term_chameleon.osc import OscSequence, sequences_for_preset, shell_printf, tmux_wrap
 from term_chameleon.visual import write_visual_report
 
 FIXTURES = Path(__file__).parent / "fixtures" / "iterm"
@@ -27,6 +27,16 @@ def test_install_command_writes_profile(tmp_path, capsys):
     written = tmp_path / "term-chameleon-adaptive-glass.json"
     assert written.exists()
     assert loads_document(written.read_text()).name == "Test Glass"
+
+
+def test_install_existing_profile_creates_backup(tmp_path):
+    assert main(["install", "--target-dir", str(tmp_path), "--name", "One"]) == 0
+    assert main(["install", "--target-dir", str(tmp_path), "--name", "Two"]) == 0
+    backups = list(tmp_path.glob("term-chameleon-adaptive-glass.json.backup.*"))
+    assert len(backups) == 1
+    assert (
+        loads_document((tmp_path / "term-chameleon-adaptive-glass.json").read_text()).name == "Two"
+    )
 
 
 def test_install_make_default_writes_compiling_autolaunch(tmp_path, capsys):
@@ -72,9 +82,26 @@ def test_apply_mode_to_profile_copy(tmp_path):
     assert list(tmp_path.glob("profile.json.backup.*"))
 
 
+def test_repeated_mode_writes_create_unique_backups(tmp_path):
+    target = tmp_path / "profile.json"
+    shutil.copy2(FIXTURES / "good-dark-glass.json", target)
+    apply_mode(target, "presentation", dry_run=False, yes=True)
+    apply_mode(target, "balanced", dry_run=False, yes=True)
+    assert len(list(tmp_path.glob("profile.json.backup.*"))) == 2
+
+
 def test_mode_command_requires_yes_or_dry_run(capsys):
     assert main(["mode", "presentation", str(FIXTURES / "good-dark-glass.json")]) == 2
     assert "Refusing to write" in capsys.readouterr().err
+
+
+def test_multi_profile_document_is_rejected(tmp_path, capsys):
+    good = json.loads((FIXTURES / "good-dark-glass.json").read_text())["Profiles"][0]
+    bad = json.loads((FIXTURES / "bad-light-variant.json").read_text())["Profiles"][0]
+    multi = tmp_path / "multi.json"
+    multi.write_text(json.dumps({"Profiles": [good, bad]}))
+    assert main(["doctor", str(multi)]) == 2
+    assert "exactly one profile" in capsys.readouterr().err
 
 
 def test_osc_sequences_include_core_controls():
@@ -91,8 +118,13 @@ def test_tmux_wrap_and_shell_printf():
     assert wrapped.startswith("\x1bPtmux;")
     assert "\x1b\x1b]11" in wrapped
     command = shell_printf(sequences_for_preset("balanced"), tmux=True)
-    assert command.startswith("printf '")
+    assert command.startswith("printf %b ")
     assert "Ptmux" in command
+
+
+def test_shell_printf_quotes_payloads():
+    command = shell_printf([OscSequence("synthetic", "abc'def")])
+    assert "'\"'\"'" in command
 
 
 def test_osc_cli(capsys):

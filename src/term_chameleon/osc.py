@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from shlex import quote
 
 from .presets import COLOR_FIELD_MAP, get_preset
 
@@ -72,7 +73,7 @@ def tmux_wrap(sequence: str) -> str:
 def shell_printf(sequences: list[OscSequence], *, tmux: bool = False) -> str:
     payload = "".join(tmux_wrap(s.sequence) if tmux else s.sequence for s in sequences)
     escaped = payload.encode("unicode_escape").decode("ascii")
-    return f"printf '{escaped}'"
+    return f"printf %b {quote(escaped)}"
 
 
 def supported_color_fields() -> list[str]:

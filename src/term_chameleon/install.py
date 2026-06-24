@@ -4,6 +4,7 @@ from pathlib import Path
 
 from .iterm_profile import dumps_document
 from .presets import apply_preset_to_profile_dict, get_preset
+from .safe_io import atomic_write_text, backup_file
 
 DEFAULT_DYNAMIC_PROFILES_DIR = (
     Path.home() / "Library" / "Application Support" / "iTerm2" / "DynamicProfiles"
@@ -44,7 +45,9 @@ def install_profile(
     target = target_dir / filename
     if not dry_run:
         target_dir.mkdir(parents=True, exist_ok=True)
-        target.write_text(content, encoding="utf-8")
+        if target.exists():
+            backup_file(target)
+        atomic_write_text(target, content)
     return target, content
 
 
@@ -100,6 +103,8 @@ def install_autolaunch_script(
     target = target_dir / AUTOLAUNCH_FILENAME
     if not dry_run:
         target_dir.mkdir(parents=True, exist_ok=True)
-        target.write_text(content, encoding="utf-8")
+        if target.exists():
+            backup_file(target)
+        atomic_write_text(target, content)
         target.chmod(0o755)
     return target, content

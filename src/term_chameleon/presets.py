@@ -173,10 +173,10 @@ def get_preset(name: str) -> Preset:
 def apply_preset_to_profile_dict(profile: dict, preset: Preset) -> None:
     profile["Use Separate Colors for Light and Dark Mode"] = False
     for field, attr in COLOR_FIELD_MAP.items():
-        value = getattr(preset, attr).to_iterm_dict()
-        profile[field] = value
-        profile[field + " (Light)"] = value
-        profile[field + " (Dark)"] = value
+        color = getattr(preset, attr)
+        profile[field] = color.to_iterm_dict()
+        profile[field + " (Light)"] = color.to_iterm_dict()
+        profile[field + " (Dark)"] = color.to_iterm_dict()
     profile["Transparency"] = preset.transparency
     profile["Blur"] = preset.blur
     profile["Blur Radius"] = preset.blur_radius

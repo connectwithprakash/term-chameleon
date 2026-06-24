@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import shutil
 from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
 
 from .diagnostics import diagnose
 from .iterm_profile import ItermProfile, dumps_document, load_profile
 from .presets import BALANCED
+from .safe_io import atomic_write_text, backup_file
 
 
 @dataclass(frozen=True)
@@ -81,9 +80,8 @@ def fix_file(path: str | Path, *, dry_run: bool, yes: bool) -> tuple[list[Change
     if not yes:
         raise ValueError("refusing to write without --yes or --dry-run")
     p = Path(path)
-    backup = p.with_name(p.name + ".backup." + datetime.now().strftime("%Y%m%dT%H%M%S"))
-    shutil.copy2(p, backup)
-    p.write_text(dumps_document(profile.document), encoding="utf-8")
+    backup_file(p)
+    atomic_write_text(p, dumps_document(profile.document))
     return changes, remaining
 
 
