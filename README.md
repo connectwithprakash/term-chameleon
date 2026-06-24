@@ -16,12 +16,16 @@ This repository is in MVP scaffolding. Implemented now:
 - iTerm2 Dynamic Profile preset install flow, including optional AutoLaunch default-profile script.
 - Manual readability mode switching for profile JSON files.
 - OSC color sequence generation, including tmux passthrough wrapping.
-- Deterministic visual contrast simulation over controlled backgrounds plus ANSI pattern artifacts.
+- Dynamic watcher foundation via `watch-sim` risk classifier and hysteresis mode selector.
+- iTerm2 live-adapter script generation/probe foundation for session-local Python API validation.
+- macOS `screencapture` probe foundation for later screenshot-based visual tests.
 - Fixture tests for good and bad iTerm2 profiles.
 
 Planned later:
 
 - Screenshot-based visual test harness with controlled backgrounds and measured text pixels.
+- Live execution of the generated iTerm2 API adapter after the `iterm2` Python package/permissions are available.
+- Heuristic and screen-sampling watcher daemon.
 - iTerm2 Python AutoLaunch daemon using session-local profile mutation.
 - OSC backend and tmux compatibility checks.
 - Screen-sampling adaptive watcher.
@@ -46,11 +50,18 @@ Apply a manual readability mode to a profile JSON file:
 term-chameleon mode bright-safe ~/Library/Application\ Support/iTerm2/DynamicProfiles/adaptive-glass.json --dry-run
 ```
 
-Print OSC color updates for the current terminal session:
+Check iTerm2 Python API readiness and generate a conservative session-local adapter script:
 
 ```bash
-term-chameleon osc apply bright-safe --shell
-term-chameleon osc reset --tmux --shell
+term-chameleon iterm-api-check
+term-chameleon iterm-live-script --preset balanced --output /tmp/term-chameleon-live.py
+```
+
+Probe macOS screenshot availability:
+
+```bash
+term-chameleon screenshot-probe
+term-chameleon screenshot-probe --capture --output artifacts/screenshot-probe/screen.png
 ```
 
 Run deterministic visual simulation:

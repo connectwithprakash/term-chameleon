@@ -13,10 +13,12 @@ from .install import (
     install_autolaunch_script,
     install_profile,
 )
+from .iterm_api import check_environment, live_adapter_script, write_live_adapter_script
 from .iterm_profile import load_profile, loads_document
 from .modes import apply_mode
 from .osc import reset_sequences, sequences_for_preset, shell_printf
 from .presets import PRESETS
+from .screenshot import probe_screenshot
 from .visual import write_visual_report
 from .watch import ModeSelector, Sample
 
@@ -65,6 +67,20 @@ def main(argv: list[str] | None = None) -> int:
     )
     watch_sim.add_argument("--stable", type=int, default=3)
 
+    sub.add_parser("iterm-api-check", help="Check local iTerm2 Python API readiness")
+
+    iterm_script = sub.add_parser(
+        "iterm-live-script", help="Generate a conservative iTerm2 session-local adapter script"
+    )
+    iterm_script.add_argument("--preset", choices=sorted(PRESETS), default="balanced")
+    iterm_script.add_argument("--output", type=Path)
+
+    screenshot = sub.add_parser("screenshot-probe", help="Check or exercise macOS screencapture")
+    screenshot.add_argument("--capture", action="store_true")
+    screenshot.add_argument(
+        "--output", type=Path, default=Path("artifacts/screenshot-probe/screen.png")
+    )
+
     args = parser.parse_args(argv)
     try:
         if args.command == "doctor":
@@ -88,6 +104,12 @@ def main(argv: list[str] | None = None) -> int:
             return _visual_test(args.profile, args.output_dir)
         if args.command == "watch-sim":
             return _watch_sim(args.samples, stable=args.stable)
+        if args.command == "iterm-api-check":
+            return _iterm_api_check()
+        if args.command == "iterm-live-script":
+            return _iterm_live_script(args.preset, output=args.output)
+        if args.command == "screenshot-probe":
+            return _screenshot_probe(capture=args.capture, output=args.output)
     except (ValueError, OSError, json.JSONDecodeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
@@ -214,6 +236,44 @@ def _watch_sim(samples: list[str], *, stable: int) -> int:
             f"{index}: luminance={sample.luminance:.2f} variance={sample.variance:.2f} "
             f"risk={classification.risk} mode={mode} {marker} reason={classification.reason}"
         )
+    return 0
+
+
+def _iterm_api_check() -> int:
+    env = check_environment()
+    print(f"iTerm2 app installed: {'yes' if env.app_installed else 'no'}")
+    print(f"iTerm2 Python package available: {'yes' if env.python_package_available else 'no'}")
+    print("app paths checked:")
+    for path in env.app_paths_checked:
+        print(f"- {path}")
+    if env.ready_for_live_probe:
+        print("[ok] ready for live iTerm2 API probe")
+        return 0
+    print("[warn] live iTerm2 API probe is not ready on this Python environment")
+    return 1
+
+
+def _iterm_live_script(preset: str, *, output: Path | None) -> int:
+    content = live_adapter_script(preset_name=preset)
+    compile(content, str(output or "<term-chameleon-iterm-live-script>"), "exec")
+    if output is None:
+        print(content)
+    else:
+        target = write_live_adapter_script(output, preset_name=preset)
+        print(f"Wrote: {target}")
+    print("[ok] generated iTerm2 live adapter script compiles")
+    return 0
+
+
+def _screenshot_probe(*, capture: bool, output: Path) -> int:
+    result = probe_screenshot(output, capture=capture)
+    print(result.message)
+    if result.output_path is not None:
+        print(f"output: {result.output_path}")
+    if not result.available:
+        return 1
+    if capture and not result.captured:
+        return 1
     return 0
 
 
