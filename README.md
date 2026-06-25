@@ -6,7 +6,7 @@ Glassy terminal themes look good until white text disappears over a bright windo
 
 ## Current status
 
-This repository is prepared as `v0.1.0-alpha.6` / Python package version `0.1.0a6`: an end-to-end alpha for static profile diagnostics, safe profile mutation, deterministic visual artifacts, live iTerm2 adaptation, and controlled macOS GUI/screenshot QA. Implemented:
+This repository is prepared as `v0.1.0-alpha.7` / Python package version `0.1.0a7`: an end-to-end alpha for static profile diagnostics, safe profile mutation, deterministic visual artifacts, live iTerm2 adaptation, and controlled macOS GUI/screenshot QA. Implemented:
 
 - iTerm2 Dynamic Profile JSON parsing.
 - Color conversion between hex and iTerm2 color dictionaries.
@@ -31,6 +31,7 @@ This repository is prepared as `v0.1.0-alpha.6` / Python package version `0.1.0a
 - Guided setup command that runs deterministic checks and optionally installs the default profile.
 - TOML config example, validation, and `--config` support for setup/watch-live/watch daemon flows.
 - Watch daemon status and uninstall commands for AutoLaunch lifecycle management.
+- Top-level release-readiness gate that composes deterministic checks, config validation, readiness, daemon, and live-stage checks.
 - Fixture tests for good and bad iTerm2 profiles.
 
 Optional future refinements:
@@ -45,8 +46,9 @@ Build and install the alpha wheel locally:
 ```bash
 uv build
 python3 -m venv /tmp/term-chameleon-alpha-venv
-/tmp/term-chameleon-alpha-venv/bin/pip install dist/term_chameleon-0.1.0a6-py3-none-any.whl
-/tmp/term-chameleon-alpha-venv/bin/term-chameleon check --output-dir /tmp/term-chameleon-alpha-check
+/tmp/term-chameleon-alpha-venv/bin/pip install 'dist/term_chameleon-0.1.0a7-py3-none-any.whl[iterm]'
+/tmp/term-chameleon-alpha-venv/bin/term-chameleon setup --yes
+/tmp/term-chameleon-alpha-venv/bin/term-chameleon release-check --output-dir /tmp/term-chameleon-alpha-release-check
 ```
 
 See [CHANGELOG.md](CHANGELOG.md) for release notes.
@@ -57,6 +59,7 @@ Run a permission-free deterministic self-check after installation or inspect loc
 
 ```bash
 term-chameleon check --output-dir artifacts/check
+term-chameleon release-check --output-dir artifacts/release-check
 term-chameleon setup
 term-chameleon setup --yes
 term-chameleon setup --live
@@ -69,6 +72,8 @@ term-chameleon status --json
 ```
 
 `setup` is a guided flow: it runs deterministic checks and reports status. On first run, bare `setup` exits nonzero until a healthy profile exists; use `setup --yes` to install the generated profile, and `setup --live` to include live iTerm2 API/window readiness.
+
+`release-check` is the top-level local gate. By default it is permission-free and writes JSON/Markdown reports; add `--config`, `--live`, `--daemon`, or `--live-stage` to include config validation, live iTerm2 probes, AutoLaunch health, or controlled Safari+iTerm2 screenshot QA.
 
 `config-example` prints a commented TOML file. `config-check` validates value types, preset names, region shape, and unknown sections/keys. `watch-live`, `install-watch-daemon`, and `setup` accept `--config`; explicit CLI flags override config values.
 

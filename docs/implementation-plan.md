@@ -122,3 +122,21 @@ Implemented:
 - `--capture` performs real screen capture and screenshot pixel analysis when permissions allow.
 
 This is the current automated integration layer before full GUI/window orchestration.
+
+## Milestone 8: setup, configuration, daemon lifecycle, and release gate
+
+Implemented:
+
+- `term-chameleon status` and `status --live` summarize local readiness and recommend the next command.
+- `term-chameleon setup` runs deterministic checks, inspects/installs the generated Dynamic Profile, and optionally verifies live iTerm2 readiness.
+- `term-chameleon config-example` and `config-check` provide repeatable TOML defaults with strict validation before setup/watch/daemon use.
+- `term-chameleon watch-daemon-status` and `uninstall-watch-daemon` complete the AutoLaunch lifecycle.
+- `term-chameleon release-check` is the top-level local release-readiness gate, composing deterministic self-checks, optional config validation, status/live readiness, optional daemon health, and optional controlled live-stage screenshot QA into JSON/Markdown reports.
+
+Acceptance:
+
+```bash
+uv run --extra dev ruff check .
+uv run --extra dev pytest -q
+uv run term-chameleon release-check --output-dir /tmp/term-chameleon-release-check --live --live-stage
+```

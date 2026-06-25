@@ -53,6 +53,7 @@ from .modes import apply_mode
 from .osc import reset_sequences, sequences_for_preset, shell_printf
 from .pixel_contrast import write_contrast_report
 from .presets import PRESETS
+from .release_check import run_release_check
 from .screenshot import probe_screenshot
 from .screenshot_test import run_screenshot_test
 from .setup import run_setup
@@ -163,6 +164,29 @@ def main(argv: list[str] | None = None) -> int:
     check.add_argument("--output-dir", type=Path, default=Path("artifacts/check"))
     check.add_argument("--width", type=int, default=96)
     check.add_argument("--height", type=int, default=48)
+
+    release_check = sub.add_parser(
+        "release-check",
+        help="Run the top-level release-readiness gate and write a report",
+    )
+    release_check.add_argument("--output-dir", type=Path, default=Path("artifacts/release-check"))
+    release_check.add_argument("--config", type=Path, help="Optional TOML config file to validate")
+    release_check.add_argument("--profile", type=Path, help="Dynamic Profile JSON path to inspect")
+    release_check.add_argument("--width", type=int, default=64)
+    release_check.add_argument("--height", type=int, default=32)
+    release_check.add_argument(
+        "--live", action="store_true", help="Include live iTerm2 readiness probes"
+    )
+    release_check.add_argument(
+        "--daemon", action="store_true", help="Require watch daemon AutoLaunch health"
+    )
+    release_check.add_argument(
+        "--live-stage",
+        action="store_true",
+        help="Drive Safari+iTerm2 and capture/analyze a live staged screenshot",
+    )
+    release_check.add_argument("--threshold", type=float, default=4.5)
+    release_check.add_argument("--settle-delay", type=float, default=0.2)
 
     status = sub.add_parser(
         "status",
@@ -388,6 +412,19 @@ def main(argv: list[str] | None = None) -> int:
             return _visual_test(args.profile, args.output_dir)
         if args.command == "check":
             return _check(output_dir=args.output_dir, width=args.width, height=args.height)
+        if args.command == "release-check":
+            return _release_check(
+                output_dir=args.output_dir,
+                config=args.config,
+                profile=args.profile,
+                width=args.width,
+                height=args.height,
+                live=args.live,
+                daemon=args.daemon,
+                live_stage=args.live_stage,
+                threshold=args.threshold,
+                settle_delay=args.settle_delay,
+            )
         if args.command == "status":
             return _status(profile=args.profile, live=args.live, json_output=args.json)
         if args.command == "setup":
@@ -802,6 +839,45 @@ def _check(*, output_dir: Path, width: int, height: int) -> int:
         return 1
     print("[ok] deterministic self-check passed")
     return 0
+
+
+def _release_check(
+    *,
+    output_dir: Path,
+    config: Path | None,
+    profile: Path | None,
+    width: int,
+    height: int,
+    live: bool,
+    daemon: bool,
+    live_stage: bool,
+    threshold: float,
+    settle_delay: float,
+) -> int:
+    report = run_release_check(
+        output_dir=output_dir,
+        config_path=config,
+        profile_path=profile,
+        live=live,
+        live_stage=live_stage,
+        daemon=daemon,
+        width=width,
+        height=height,
+        live_stage_threshold=threshold,
+        live_stage_settle_delay=settle_delay,
+    )
+    json_path = output_dir / "release-check-report.json"
+    md_path = output_dir / "release-check-report.md"
+    print(f"Wrote: {json_path}")
+    print(f"Wrote: {md_path}")
+    for step in report.steps:
+        marker = "ok" if step.passed else "fail"
+        print(f"[{marker}] {step.name}: {step.detail}")
+    if report.passed:
+        print("[ok] release check passed")
+        return 0
+    print("[fail] release check failed")
+    return 1
 
 
 def _status(*, profile: Path | None, live: bool, json_output: bool) -> int:

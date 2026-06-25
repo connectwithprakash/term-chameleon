@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.0a7 - 2026-06-25
+
+### Added
+
+- `term-chameleon release-check` top-level release-readiness gate.
+- Release-check JSON/Markdown reports that compose deterministic checks, optional config validation, readiness status, daemon status, and live-stage screenshot QA.
+- Tests for release-check success/failure behavior.
+
 ## 0.1.0a6 - 2026-06-25
 
 ### Added
