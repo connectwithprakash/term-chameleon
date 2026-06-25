@@ -40,6 +40,7 @@ from .presets import PRESETS
 from .screenshot import probe_screenshot
 from .screenshot_test import run_screenshot_test
 from .terminal_pattern import write_pattern_bundle
+from .text_contrast import write_text_contrast_report
 from .visual import write_visual_report
 from .watch import ModeSelector, Sample
 from .watch_daemon import (
@@ -179,6 +180,19 @@ def main(argv: list[str] | None = None) -> int:
     contrast.add_argument("--threshold", type=float, default=4.5)
     contrast.add_argument("--percentile", type=float, default=0.10)
 
+    text_contrast = sub.add_parser(
+        "screenshot-text-contrast",
+        help="Estimate text/background contrast by detecting text-like screenshot rows",
+    )
+    text_contrast.add_argument("image", type=Path)
+    text_contrast.add_argument(
+        "--output-dir", type=Path, default=Path("artifacts/screenshot-text-contrast")
+    )
+    text_contrast.add_argument("--region", help="Analyze only x,y,width,height")
+    text_contrast.add_argument("--threshold", type=float, default=4.5)
+    text_contrast.add_argument("--min-row-delta", type=float, default=0.12)
+    text_contrast.add_argument("--glyph-delta", type=float, default=0.08)
+
     backgrounds = sub.add_parser("background-html", help="Generate controlled HTML backgrounds")
     backgrounds.add_argument("--output-dir", type=Path, default=Path("artifacts/background-html"))
     backgrounds.add_argument("--open", action="store_true", dest="open_browser")
@@ -313,6 +327,15 @@ def main(argv: list[str] | None = None) -> int:
                 region=args.region,
                 threshold=args.threshold,
                 percentile=args.percentile,
+            )
+        if args.command == "screenshot-text-contrast":
+            return _screenshot_text_contrast(
+                image=args.image,
+                output_dir=args.output_dir,
+                region=args.region,
+                threshold=args.threshold,
+                min_row_delta=args.min_row_delta,
+                glyph_delta=args.glyph_delta,
             )
         if args.command == "background-html":
             return _background_html(output_dir=args.output_dir, open_browser=args.open_browser)
@@ -682,6 +705,33 @@ def _screenshot_contrast(
     print(f"Light cluster: {estimate.light_color}")
     print(f"Estimated contrast: {estimate.contrast:.2f}:1")
     print("[ok] screenshot contrast estimate passed" if estimate.passed else "[fail] low contrast")
+    return 0 if estimate.passed else 1
+
+
+def _screenshot_text_contrast(
+    *,
+    image: Path,
+    output_dir: Path,
+    region: str | None,
+    threshold: float,
+    min_row_delta: float,
+    glyph_delta: float,
+) -> int:
+    json_path, md_path, estimate = write_text_contrast_report(
+        image,
+        output_dir,
+        region=Region.parse(region) if region else None,
+        threshold=threshold,
+        min_row_delta=min_row_delta,
+        glyph_delta=glyph_delta,
+    )
+    print(f"Wrote: {json_path}")
+    print(f"Wrote: {md_path}")
+    print(f"Detected row bands: {len(estimate.bands)}")
+    print(f"Foreground estimate: {estimate.foreground_color}")
+    print(f"Background estimate: {estimate.background_color}")
+    print(f"Estimated contrast: {estimate.contrast:.2f}:1")
+    print("[ok] text contrast estimate passed" if estimate.passed else "[fail] low text contrast")
     return 0 if estimate.passed else 1
 
 

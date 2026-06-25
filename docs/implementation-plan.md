@@ -68,13 +68,14 @@ Implemented:
 - Deterministic visual simulation: controlled solid-background blending, ANSI pattern artifact, JSON/Markdown reports, and WCAG contrast checks.
 - Screenshot-test foundation: controlled PPM background artifacts, luminance/variance/risk classification, optional real macOS screenshot capture, PNG screenshot luminance/variance analysis.
 - Screenshot pixel contrast estimator: darkest/lightest cluster contrast reports for captured PNG/PPM artifacts.
+- Text-row/glyph-aware contrast estimator: detects high-delta text-like rows and estimates glyph/background contrast.
 - Controlled HTML backgrounds for browser/window staging.
 - Terminal ANSI pattern script artifacts.
 - Live GUI staging: `term-chameleon live-stage` arranges Safari controlled-background and iTerm2 ANSI-pattern windows, then optionally captures/analyzes screenshot region contrast.
 
 Remaining live visual work:
 
-- Locate exact rendered text glyph rows instead of using darkest/lightest pixel clusters.
+- Optional future refinement: replace heuristic text-row detection with OCR/terminal-cell-aware glyph segmentation.
 
 ## Milestone 5: dynamic watcher and one-shot adaptation
 
@@ -110,7 +111,7 @@ Observed local state:
 
 Remaining live iTerm2 work:
 
-1. Improve screenshot analysis to locate exact rendered text glyph rows instead of using whole-region pixel clusters.
+1. Optional future refinement: replace heuristic text-row detection with OCR/terminal-cell-aware glyph segmentation.
 
 ## Milestone 7: deterministic E2E staging
 
