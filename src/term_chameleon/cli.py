@@ -32,6 +32,7 @@ from .iterm_api import (
 from .iterm_connection import probe_iterm_connection
 from .iterm_profile import load_profile, loads_document
 from .iterm_window import get_iterm_window_bounds
+from .live_stage import run_live_stage
 from .modes import apply_mode
 from .osc import reset_sequences, sequences_for_preset, shell_printf
 from .pixel_contrast import write_contrast_report
@@ -192,6 +193,24 @@ def main(argv: list[str] | None = None) -> int:
     e2e.add_argument("--width", type=int, default=640)
     e2e.add_argument("--height", type=int, default=360)
 
+    live_stage = sub.add_parser(
+        "live-stage",
+        help="Arrange controlled browser+iTerm2 windows and optionally capture/analyze",
+    )
+    live_stage.add_argument("--output-dir", type=Path, default=Path("artifacts/live-stage"))
+    live_stage.add_argument(
+        "--background",
+        choices=["solid-dark", "solid-light", "mid-gray", "checkerboard", "gradient"],
+        default="solid-light",
+    )
+    live_stage.add_argument("--browser-bounds", default="0,0,1470,956")
+    live_stage.add_argument("--iterm-bounds", default="80,90,980,760")
+    live_stage.add_argument("--capture", action="store_true")
+    live_stage.add_argument("--threshold", type=float, default=4.5)
+    live_stage.add_argument("--settle-delay", type=float, default=1.0)
+    live_stage.add_argument("--dry-run", action="store_true")
+    live_stage.add_argument("--yes", action="store_true", help="Actually drive Safari and iTerm2")
+
     sample = sub.add_parser("sample", help="Sample an image or live screen and suggest a mode")
     sample_source = sample.add_mutually_exclusive_group(required=True)
     sample_source.add_argument("--image", type=Path)
@@ -306,6 +325,18 @@ def main(argv: list[str] | None = None) -> int:
                 capture=args.capture,
                 width=args.width,
                 height=args.height,
+            )
+        if args.command == "live-stage":
+            return _live_stage(
+                output_dir=args.output_dir,
+                background=args.background,
+                browser_bounds=args.browser_bounds,
+                iterm_bounds=args.iterm_bounds,
+                capture=args.capture,
+                threshold=args.threshold,
+                settle_delay=args.settle_delay,
+                dry_run=args.dry_run,
+                yes=args.yes,
             )
         if args.command == "sample":
             return _sample(
@@ -688,6 +719,59 @@ def _e2e_stage(*, profile: Path, output_dir: Path, capture: bool, width: int, he
     print(f"Screenshot report: {report.screenshot_report_json}")
     print(f"Screenshot captured: {report.screenshot_captured}")
     print("[ok] e2e staging bundle passed")
+    return 0
+
+
+def _live_stage(
+    *,
+    output_dir: Path,
+    background: str,
+    browser_bounds: str,
+    iterm_bounds: str,
+    capture: bool,
+    threshold: float,
+    settle_delay: float,
+    dry_run: bool,
+    yes: bool,
+) -> int:
+    if not dry_run and not yes:
+        print(
+            "Refusing to drive GUI apps without --yes. Use --dry-run to preview.", file=sys.stderr
+        )
+        return 2
+    report = run_live_stage(
+        output_dir,
+        background=background,
+        browser_bounds=browser_bounds,
+        iterm_bounds=iterm_bounds,
+        dry_run=dry_run,
+        capture=capture,
+        threshold=threshold,
+        settle_delay=settle_delay,
+    )
+    print(f"Wrote: {report.output_dir / 'live-stage-report.json'}")
+    print(f"Wrote: {report.output_dir / 'live-stage-report.md'}")
+    print(f"Background: {report.background_file}")
+    print(f"Pattern script: {report.pattern_script}")
+    print(f"Browser return code: {report.browser_returncode}")
+    print(f"iTerm2 return code: {report.iterm_returncode}")
+    if report.screenshot_path:
+        print(f"Screenshot: {report.screenshot_path}")
+        print(f"Screenshot captured: {report.screenshot_captured}")
+    if report.iterm_region:
+        print(f"iTerm2 region: {report.iterm_region}")
+    if report.suggested_mode:
+        print(f"Suggested mode: {report.suggested_mode}")
+    if report.estimated_contrast is not None:
+        print(f"Estimated contrast: {report.estimated_contrast:.2f}:1")
+    if not dry_run:
+        if report.browser_returncode != 0 or report.iterm_returncode != 0:
+            return 1
+        if capture and not report.screenshot_captured:
+            return 1
+        if capture and report.contrast_passed is False:
+            return 1
+    print("[ok] live stage completed")
     return 0
 
 

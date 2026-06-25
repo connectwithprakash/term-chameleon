@@ -22,6 +22,7 @@ This repository is in MVP scaffolding. Implemented now:
 - Live adaptive watcher via `watch-live`, with dry-run, stable-sample, cooldown, duration, and real iTerm2 session-local apply modes.
 - Deterministic E2E staging bundle that combines controlled backgrounds, ANSI pattern artifacts, visual simulation, screenshot capture, and screenshot pixel analysis.
 - Screenshot contrast estimation for captured PNG/PPM artifacts.
+- Live GUI staging that arranges controlled Safari background + iTerm2 ANSI pattern windows and can optionally capture/analyze the result.
 - macOS `screencapture` probe and screenshot-test artifact foundation for screenshot-based visual tests.
 - Long-running daemon packaging for continuous adaptation.
 - Fixture tests for good and bad iTerm2 profiles.
@@ -71,6 +72,13 @@ term-chameleon screenshot-test --capture --output-dir artifacts/screenshot-test
 term-chameleon background-html --output-dir artifacts/background-html
 term-chameleon pattern-script --output-dir artifacts/pattern-script
 term-chameleon e2e-stage tests/fixtures/iterm/good-dark-glass.json --output-dir artifacts/e2e-stage
+term-chameleon live-stage --dry-run --output-dir artifacts/live-stage
+term-chameleon live-stage --yes --capture --output-dir artifacts/live-stage
+```
+
+`live-stage --yes` is intentionally explicit because it activates Safari, opens the controlled background page, creates/resizes an iTerm2 window, writes the ANSI pattern command into that session, and may require macOS Automation/Accessibility/Screen Recording permissions. It leaves the staged windows open for inspection.
+
+```bash
 term-chameleon sample --screen --output artifacts/adapt/screen.png
 term-chameleon sample --screen --iterm-window --output artifacts/adapt/iterm-window.png
 term-chameleon sample --screen --region 0,0,800,600 --output artifacts/adapt/region.png

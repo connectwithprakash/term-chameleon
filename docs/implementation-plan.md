@@ -70,11 +70,11 @@ Implemented:
 - Screenshot pixel contrast estimator: darkest/lightest cluster contrast reports for captured PNG/PPM artifacts.
 - Controlled HTML backgrounds for browser/window staging.
 - Terminal ANSI pattern script artifacts.
+- Live GUI staging: `term-chameleon live-stage` arranges Safari controlled-background and iTerm2 ANSI-pattern windows, then optionally captures/analyzes screenshot region contrast.
 
 Remaining live visual work:
 
-- Automatically arrange controlled browser background + iTerm2 pattern window.
-- Locate rendered text pixels and compute foreground/background contrast from screenshots.
+- Locate exact rendered text glyph rows instead of using darkest/lightest pixel clusters.
 
 ## Milestone 5: dynamic watcher and one-shot adaptation
 
@@ -110,7 +110,7 @@ Observed local state:
 
 Remaining live iTerm2 work:
 
-1. Add optional window orchestration for fully automatic screenshot/text-pixel validation.
+1. Improve screenshot analysis to locate exact rendered text glyph rows instead of using whole-region pixel clusters.
 
 ## Milestone 7: deterministic E2E staging
 
