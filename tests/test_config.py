@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from term_chameleon.cli import _watch_live, main
-from term_chameleon.config import EXAMPLE_CONFIG, ConfigError, load_config
+from term_chameleon.config import EXAMPLE_CONFIG, ConfigError, load_config, validate_config
 
 
 def test_config_example_cli_prints_toml(capsys):
@@ -26,6 +26,99 @@ def test_load_config_rejects_missing_file(tmp_path):
         assert "config file not found" in str(exc)
     else:
         raise AssertionError("expected ConfigError")
+
+
+def test_validate_config_reports_errors_and_warnings():
+    validation = validate_config(
+        {
+            "watch": {
+                "interval": "fast",
+                "initial_mode": "bogus",
+                "region": "1,2,0,4",
+                "iterm_window": True,
+                "extra": 123,
+            },
+            "unknown": {},
+        },
+        path="/tmp/config.toml",
+    )
+    assert validation.passed is False
+    joined_errors = "\n".join(validation.errors)
+    joined_warnings = "\n".join(validation.warnings)
+    assert "[watch].interval" in joined_errors
+    assert "unknown preset/mode 'bogus'" in joined_errors
+    assert "width and height must be positive" in joined_errors
+    assert "unknown top-level section [unknown]" in joined_errors
+    assert "unknown key [watch].extra" in joined_errors
+    assert "region takes precedence" in joined_warnings
+
+
+def test_config_check_cli_success_json(tmp_path, capsys):
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(EXAMPLE_CONFIG, encoding="utf-8")
+    assert main(["config-check", "--config", str(config_path), "--json"]) == 0
+    out = capsys.readouterr().out
+    assert '"passed": true' in out
+    assert '"errors": []' in out
+
+
+def test_config_check_cli_validation_failure(tmp_path, capsys):
+    config_path = tmp_path / "config.toml"
+    config_path.write_text('[watch]\ninterval = "fast"\n', encoding="utf-8")
+    assert main(["config-check", "--config", str(config_path)]) == 1
+    out = capsys.readouterr().out
+    assert "[fail] [watch].interval" in out
+    assert "config has validation errors" in out
+
+
+def test_config_check_rejects_runtime_range_mismatches(tmp_path, capsys):
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(
+        """
+[watch]
+interval = -1.0
+duration = 0.0
+stable = 0
+cooldown = -0.1
+""".strip(),
+        encoding="utf-8",
+    )
+    assert main(["config-check", "--config", str(config_path)]) == 1
+    out = capsys.readouterr().out
+    assert "[watch].interval: expected number > 0" in out
+    assert "[watch].duration: expected number > 0" in out
+    assert "[watch].stable: expected integer >= 1" in out
+    assert "[watch].cooldown: expected number >= 0" in out
+
+
+def test_config_check_rejects_unknown_section_and_key(tmp_path, capsys):
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(
+        """
+[watc]
+interval = 1.0
+
+[watch]
+intervl = 1.0
+""".strip(),
+        encoding="utf-8",
+    )
+    assert main(["config-check", "--config", str(config_path)]) == 1
+    out = capsys.readouterr().out
+    assert "unknown top-level section [watc]" in out
+    assert "unknown key [watch].intervl" in out
+
+
+def test_config_check_rejects_daemon_duration_as_unused(tmp_path, capsys):
+    config_path = tmp_path / "config.toml"
+    config_path.write_text("[daemon]\nduration = 5\n", encoding="utf-8")
+    assert main(["config-check", "--config", str(config_path)]) == 1
+    assert "unknown key [daemon].duration" in capsys.readouterr().out
+
+
+def test_config_check_cli_missing_file_returns_usage_error(tmp_path, capsys):
+    assert main(["config-check", "--config", str(tmp_path / "missing.toml")]) == 2
+    assert "config file not found" in capsys.readouterr().err
 
 
 def test_watch_live_uses_config_values(monkeypatch, tmp_path):

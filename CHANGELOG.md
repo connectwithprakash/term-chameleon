@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.0a6 - 2026-06-25
+
+### Added
+
+- `term-chameleon config-check` for validating TOML configs before setup/watch/daemon use.
+- Config validation for value types, preset names, region shape, and unknown sections/keys.
+- JSON output for config validation reports.
+
 ## 0.1.0a5 - 2026-06-25
 
 ### Added

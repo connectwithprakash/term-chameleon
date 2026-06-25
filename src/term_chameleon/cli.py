@@ -15,6 +15,7 @@ from .adapt import (
 )
 from .background_html import open_file, write_background_html
 from .config import (
+    DEFAULT_CONFIG_PATH,
     EXAMPLE_CONFIG,
     ConfigError,
     bool_value,
@@ -24,6 +25,7 @@ from .config import (
     merged_section,
     path_value,
     str_value,
+    validate_config,
     value,
 )
 from .deterministic_check import run_deterministic_check
@@ -184,6 +186,15 @@ def main(argv: list[str] | None = None) -> int:
 
     config_example = sub.add_parser("config-example", help="Print an example TOML config")
     config_example.add_argument("--output", type=Path, help="Write config example to a file")
+
+    config_check = sub.add_parser("config-check", help="Validate a Term Chameleon TOML config")
+    config_check.add_argument(
+        "--config",
+        type=Path,
+        default=DEFAULT_CONFIG_PATH,
+        help="TOML config file to validate",
+    )
+    config_check.add_argument("--json", action="store_true", help="Emit validation as JSON")
 
     watch_sim = sub.add_parser("watch-sim", help="Simulate dynamic mode selection from samples")
     watch_sim.add_argument(
@@ -391,6 +402,8 @@ def main(argv: list[str] | None = None) -> int:
             )
         if args.command == "config-example":
             return _config_example(output=args.output)
+        if args.command == "config-check":
+            return _config_check(config=args.config, json_output=args.json)
         if args.command == "watch-sim":
             return _watch_sim(args.samples, stable=args.stable)
         if args.command == "watch-live":
@@ -859,6 +872,25 @@ def _config_example(*, output: Path | None) -> int:
         output.expanduser().write_text(EXAMPLE_CONFIG, encoding="utf-8")
         print(f"Wrote: {output.expanduser()}")
     return 0
+
+
+def _config_check(*, config: Path, json_output: bool) -> int:
+    loaded = load_config(config)
+    validation = validate_config(loaded, path=config)
+    if json_output:
+        print(json.dumps(validation.as_dict(), indent=2))
+    else:
+        print(f"Config: {Path(config).expanduser()}")
+        print(f"Sections: {', '.join(validation.sections) if validation.sections else '(none)'}")
+        for warning in validation.warnings:
+            print(f"[warn] {warning}")
+        for error in validation.errors:
+            print(f"[fail] {error}")
+        if validation.passed:
+            print("[ok] config is valid")
+        else:
+            print("[fail] config has validation errors")
+    return 0 if validation.passed else 1
 
 
 def _watch_sim(samples: list[str], *, stable: int) -> int:
