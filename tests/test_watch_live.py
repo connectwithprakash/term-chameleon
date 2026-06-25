@@ -77,6 +77,41 @@ def test_watch_live_applies_when_not_dry_run(tmp_path):
     assert events[0].applied is True
 
 
+def test_watch_live_continues_when_live_apply_fails(tmp_path):
+    samples = [Sample(0.8), Sample(0.8)]
+    attempted = []
+
+    def provider(index: int, _output_dir: Path, _region):
+        return samples[index - 1], f"sample-{index}"
+
+    def apply(mode: str) -> LiveApplyResult:
+        attempted.append(mode)
+        raise RuntimeError("no current iTerm2 session")
+
+    clock = FakeClock()
+    events = run_watch_live(
+        WatchLiveConfig(
+            interval=1,
+            duration=1,
+            stable=1,
+            cooldown=10,
+            output_dir=tmp_path,
+            dry_run=False,
+            initial_mode="balanced",
+        ),
+        sample_provider=provider,
+        apply_preset=apply,
+        sleep=clock.sleep,
+        clock=clock,
+    )
+    assert attempted == ["bright-safe"]
+    assert len(events) == 2
+    assert events[0].switched is True
+    assert events[0].applied is False
+    assert "apply failed; will continue watching" in events[0].message
+    assert events[1].switched is False
+
+
 def test_watch_live_cooldown_holds_second_switch(tmp_path):
     samples = [Sample(0.8), Sample(0.2)]
 

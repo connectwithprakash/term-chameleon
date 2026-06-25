@@ -137,8 +137,8 @@ Implemented:
 
 Implemented/verified:
 
-- Built and installed the wheel into a fresh venv.
-- Ran `setup --yes` and live `release-check --live --live-stage` successfully.
-- Installed the real iTerm2 AutoLaunch watcher daemon, restarted iTerm2, fixed startup timing so `watch-live --iterm-window` waits for the first window instead of exiting, and verified one running watcher process with healthy daemon status.
+- Installed the beta wheel into a durable local venv (`~/.local/share/term-chameleon/venv`), reinstalled AutoLaunch with default pid/log paths, restarted iTerm2, and verified sample artifacts plus live release gate.
+- Hardened long-running watcher behavior so transient iTerm2 apply failures (for example no current session) are logged as recoverable events instead of terminating the daemon.
+
 - Observed watcher screenshot sample artifacts over a sustained run.
-- Promoted release metadata to `0.1.0b1` / `v0.1.0-beta.1`.
+- Promoted release metadata to `0.1.0b2` / `v0.1.0-beta.2`.

@@ -123,9 +123,14 @@ def run_watch_live(
                 message = f"dry-run would apply {mode}"
                 applied = False
             else:
-                result = apply_preset(mode)
-                message = result.message
-                applied = result.applied
+                try:
+                    result = apply_preset(mode)
+                except RuntimeError as exc:
+                    message = f"apply failed; will continue watching: {exc}"
+                    applied = False
+                else:
+                    message = result.message
+                    applied = result.applied
             next_allowed_switch = now + config.cooldown
 
         events.append(

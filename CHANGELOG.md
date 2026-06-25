@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.0b2 - 2026-06-25
+
+### Fixed
+
+- `watch-live` now treats live iTerm2 apply failures as recoverable watcher events instead of exiting the long-running daemon. This keeps AutoLaunch watchers alive when iTerm2 temporarily has no current session.
+
+### Verified
+
+- Durable local install under `~/.local/share/term-chameleon/venv`.
+- Real iTerm2 AutoLaunch restart with default pid/log paths and sample artifacts.
+
 ## 0.1.0b1 - 2026-06-25
 
 ### Changed
