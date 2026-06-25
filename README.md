@@ -6,7 +6,7 @@ Glassy terminal themes look good until white text disappears over a bright windo
 
 ## Current status
 
-This repository now has an end-to-end MVP for static profile diagnostics, safe profile mutation, deterministic visual artifacts, live iTerm2 adaptation, and controlled macOS GUI/screenshot QA. Implemented:
+This repository is prepared as `v0.1.0-alpha.1` / Python package version `0.1.0a1`: an end-to-end alpha for static profile diagnostics, safe profile mutation, deterministic visual artifacts, live iTerm2 adaptation, and controlled macOS GUI/screenshot QA. Implemented:
 
 - iTerm2 Dynamic Profile JSON parsing.
 - Color conversion between hex and iTerm2 color dictionaries.
@@ -33,6 +33,19 @@ Optional future refinements:
 
 - Replace heuristic text-row detection with OCR/terminal-cell-aware glyph segmentation.
 - Add broader terminal emulator support beyond iTerm2.
+
+## Alpha release verification
+
+Build and install the alpha wheel locally:
+
+```bash
+uv build
+python3 -m venv /tmp/term-chameleon-alpha-venv
+/tmp/term-chameleon-alpha-venv/bin/pip install dist/term_chameleon-0.1.0a1-py3-none-any.whl
+/tmp/term-chameleon-alpha-venv/bin/term-chameleon check --output-dir /tmp/term-chameleon-alpha-check
+```
+
+See [CHANGELOG.md](CHANGELOG.md) for release notes.
 
 ## CLI examples
 

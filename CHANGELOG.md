@@ -1,0 +1,25 @@
+# Changelog
+
+## 0.1.0a1 - 2026-06-25
+
+Initial alpha release candidate for Term Chameleon.
+
+### Added
+
+- iTerm2 Dynamic Profile parsing, diagnostics, and conservative safe fixes.
+- Machine-readable `doctor --json` diagnostics with preserved exit-code semantics.
+- Generated iTerm2 Dynamic Profile preset install flow and optional AutoLaunch default-profile script.
+- Manual profile mode switching and OSC/tmux color sequence generation.
+- Screen/image sampling with one-shot profile adaptation.
+- Live adaptive watcher with dry-run, stability, cooldown, duration, and iTerm2 session-local apply modes.
+- iTerm2 Python API readiness checks, connection probe, window bounds probe, and live-adapter script generation.
+- AutoLaunch watcher daemon packaging for continuous adaptation.
+- Deterministic visual simulation, E2E staging artifacts, screenshot probes, pixel contrast, and text-row contrast reports.
+- Controlled Safari+iTerm2 live GUI staging with explicit `--yes` gate and text-row contrast with pixel-cluster fallback.
+- Permission-free `term-chameleon check` deterministic self-check for post-install validation.
+
+### Notes
+
+- Live GUI and live watcher flows may require macOS Screen Recording, Automation, Accessibility, and iTerm2 Python API permissions.
+- Text-row contrast is heuristic; future releases may add OCR or terminal-cell-aware glyph segmentation.
+- iTerm2 on macOS is the supported terminal target for this alpha.
