@@ -21,6 +21,7 @@ This repository is in MVP scaffolding. Implemented now:
 - Screen/image sampling one-shot adaptation via `sample` and `adapt-once`.
 - Live adaptive watcher via `watch-live`, with dry-run, stable-sample, cooldown, duration, and real iTerm2 session-local apply modes.
 - Deterministic E2E staging bundle that combines controlled backgrounds, ANSI pattern artifacts, visual simulation, screenshot capture, and screenshot pixel analysis.
+- Screenshot contrast estimation for captured PNG/PPM artifacts.
 - macOS `screencapture` probe and screenshot-test artifact foundation for screenshot-based visual tests.
 - Long-running daemon packaging for continuous adaptation.
 - Fixture tests for good and bad iTerm2 profiles.
@@ -64,6 +65,7 @@ Probe macOS screenshot availability and generate controlled screenshot-test arti
 ```bash
 term-chameleon screenshot-probe
 term-chameleon screenshot-probe --capture --output artifacts/screenshot-probe/screen.png
+term-chameleon screenshot-contrast artifacts/screenshot-probe/screen.png --output-dir artifacts/screenshot-contrast
 term-chameleon screenshot-test --output-dir artifacts/screenshot-test
 term-chameleon screenshot-test --capture --output-dir artifacts/screenshot-test
 term-chameleon background-html --output-dir artifacts/background-html

@@ -67,6 +67,7 @@ Implemented:
 
 - Deterministic visual simulation: controlled solid-background blending, ANSI pattern artifact, JSON/Markdown reports, and WCAG contrast checks.
 - Screenshot-test foundation: controlled PPM background artifacts, luminance/variance/risk classification, optional real macOS screenshot capture, PNG screenshot luminance/variance analysis.
+- Screenshot pixel contrast estimator: darkest/lightest cluster contrast reports for captured PNG/PPM artifacts.
 - Controlled HTML backgrounds for browser/window staging.
 - Terminal ANSI pattern script artifacts.
 

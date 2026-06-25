@@ -34,6 +34,7 @@ from .iterm_profile import load_profile, loads_document
 from .iterm_window import get_iterm_window_bounds
 from .modes import apply_mode
 from .osc import reset_sequences, sequences_for_preset, shell_printf
+from .pixel_contrast import write_contrast_report
 from .presets import PRESETS
 from .screenshot import probe_screenshot
 from .screenshot_test import run_screenshot_test
@@ -168,6 +169,15 @@ def main(argv: list[str] | None = None) -> int:
     screenshot_test.add_argument("--width", type=int, default=640)
     screenshot_test.add_argument("--height", type=int, default=360)
 
+    contrast = sub.add_parser(
+        "screenshot-contrast", help="Estimate foreground/background contrast from image pixels"
+    )
+    contrast.add_argument("image", type=Path)
+    contrast.add_argument("--output-dir", type=Path, default=Path("artifacts/screenshot-contrast"))
+    contrast.add_argument("--region", help="Analyze only x,y,width,height")
+    contrast.add_argument("--threshold", type=float, default=4.5)
+    contrast.add_argument("--percentile", type=float, default=0.10)
+
     backgrounds = sub.add_parser("background-html", help="Generate controlled HTML backgrounds")
     backgrounds.add_argument("--output-dir", type=Path, default=Path("artifacts/background-html"))
     backgrounds.add_argument("--open", action="store_true", dest="open_browser")
@@ -276,6 +286,14 @@ def main(argv: list[str] | None = None) -> int:
                 capture=args.capture,
                 width=args.width,
                 height=args.height,
+            )
+        if args.command == "screenshot-contrast":
+            return _screenshot_contrast(
+                image=args.image,
+                output_dir=args.output_dir,
+                region=args.region,
+                threshold=args.threshold,
+                percentile=args.percentile,
             )
         if args.command == "background-html":
             return _background_html(output_dir=args.output_dir, open_browser=args.open_browser)
@@ -615,6 +633,25 @@ def _screenshot_test(*, output_dir: Path, capture: bool, width: int, height: int
             return 1
     print("[ok] screenshot-test foundation passed")
     return 0
+
+
+def _screenshot_contrast(
+    *, image: Path, output_dir: Path, region: str | None, threshold: float, percentile: float
+) -> int:
+    json_path, md_path, estimate = write_contrast_report(
+        image,
+        output_dir,
+        region=Region.parse(region) if region else None,
+        threshold=threshold,
+        percentile=percentile,
+    )
+    print(f"Wrote: {json_path}")
+    print(f"Wrote: {md_path}")
+    print(f"Dark cluster: {estimate.dark_color}")
+    print(f"Light cluster: {estimate.light_color}")
+    print(f"Estimated contrast: {estimate.contrast:.2f}:1")
+    print("[ok] screenshot contrast estimate passed" if estimate.passed else "[fail] low contrast")
+    return 0 if estimate.passed else 1
 
 
 def _background_html(*, output_dir: Path, open_browser: bool) -> int:
