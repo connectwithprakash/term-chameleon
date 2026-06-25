@@ -22,13 +22,12 @@ This repository is in MVP scaffolding. Implemented now:
 - Live adaptive watcher via `watch-live`, with dry-run, stable-sample, cooldown, duration, and real iTerm2 session-local apply modes.
 - Deterministic E2E staging bundle that combines controlled backgrounds, ANSI pattern artifacts, visual simulation, screenshot capture, and screenshot pixel analysis.
 - macOS `screencapture` probe and screenshot-test artifact foundation for screenshot-based visual tests.
+- Long-running daemon packaging for continuous adaptation.
 - Fixture tests for good and bad iTerm2 profiles.
 
 Planned later:
 
-- Live execution of the generated iTerm2 API adapter from inside iTerm2 after user grants any required automation/Python API permissions.
 - Full window orchestration: automatically arrange controlled browser background + iTerm2 pattern window and measure actual text pixels.
-- Long-running daemon packaging for continuous adaptation.
 
 ## CLI examples
 
@@ -38,10 +37,11 @@ Install a balanced preset into a target directory:
 term-chameleon install --target-dir /tmp/iterm-dynamic-profiles --name "Adaptive Glass"
 ```
 
-Install and generate an iTerm2 AutoLaunch script that makes the profile default:
+Install an iTerm2 AutoLaunch script that starts the live watcher whenever iTerm2 launches:
 
 ```bash
-term-chameleon install --make-default --name "Adaptive Glass"
+term-chameleon install-watch-daemon --dry-run
+term-chameleon install-watch-daemon
 ```
 
 Apply a manual readability mode to a profile JSON file:

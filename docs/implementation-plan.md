@@ -97,6 +97,7 @@ Implemented:
 - `term-chameleon iterm-live-script` generates a conservative session-local adapter script using `LocalWriteOnlyProfile` and `session.async_set_profile_properties`.
 - Optional package extra: `uv sync --extra iterm`.
 - `term-chameleon screenshot-probe` checks macOS `screencapture` availability and can attempt a real capture.
+- `term-chameleon install-watch-daemon` packages the validated live watcher as an iTerm2 AutoLaunch script with pid/log paths and duplicate-process guard.
 
 Observed local state:
 
@@ -108,9 +109,7 @@ Observed local state:
 
 Remaining live iTerm2 work:
 
-1. Run the generated script from inside iTerm2 after any required iTerm2 Python API permissions are enabled.
-2. Package a long-running AutoLaunch daemon around the validated session-local adapter.
-3. Add optional window orchestration for fully automatic screenshot/text-pixel validation.
+1. Add optional window orchestration for fully automatic screenshot/text-pixel validation.
 
 ## Milestone 7: deterministic E2E staging
 

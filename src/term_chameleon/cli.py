@@ -40,6 +40,13 @@ from .screenshot_test import run_screenshot_test
 from .terminal_pattern import write_pattern_bundle
 from .visual import write_visual_report
 from .watch import ModeSelector, Sample
+from .watch_daemon import (
+    DEFAULT_LOG_PATH,
+    DEFAULT_PID_PATH,
+    install_watch_autolaunch_script,
+    shell_command,
+    watch_live_command,
+)
 from .watch_live import WatchLiveConfig, run_watch_live
 
 
@@ -62,6 +69,32 @@ def main(argv: list[str] | None = None) -> int:
     install.add_argument("--autolaunch-dir", type=Path, default=DEFAULT_AUTOLAUNCH_DIR)
     install.add_argument("--make-default", action="store_true")
     install.add_argument("--dry-run", action="store_true")
+
+    install_watch = sub.add_parser(
+        "install-watch-daemon",
+        help="Install an iTerm2 AutoLaunch script that starts watch-live",
+    )
+    install_watch.add_argument("--autolaunch-dir", type=Path, default=DEFAULT_AUTOLAUNCH_DIR)
+    install_watch.add_argument("--python", dest="python_executable", default=sys.executable)
+    install_watch.add_argument("--interval", type=float, default=2.0)
+    install_watch.add_argument("--stable", type=int, default=3)
+    install_watch.add_argument("--cooldown", type=float, default=10.0)
+    install_watch.add_argument(
+        "--output-dir",
+        type=Path,
+        default=Path("~/Library/Logs/term-chameleon/watch-live-artifacts"),
+    )
+    install_watch.add_argument("--initial-mode", choices=sorted(PRESETS), default="balanced")
+    daemon_region = install_watch.add_mutually_exclusive_group()
+    daemon_region.add_argument("--region", help="Screen region as x,y,width,height")
+    daemon_region.add_argument(
+        "--whole-screen",
+        action="store_true",
+        help="Sample the whole screen instead of the iTerm window",
+    )
+    install_watch.add_argument("--log-path", type=Path, default=DEFAULT_LOG_PATH)
+    install_watch.add_argument("--pid-path", type=Path, default=DEFAULT_PID_PATH)
+    install_watch.add_argument("--dry-run", action="store_true")
 
     mode = sub.add_parser("mode", help="Apply a readability mode/preset to a profile JSON file")
     mode.add_argument("preset", choices=sorted(PRESETS))
@@ -189,6 +222,21 @@ def main(argv: list[str] | None = None) -> int:
                 name=args.name,
                 preset=args.preset,
                 make_default=args.make_default,
+                dry_run=args.dry_run,
+            )
+        if args.command == "install-watch-daemon":
+            return _install_watch_daemon(
+                autolaunch_dir=args.autolaunch_dir,
+                python_executable=args.python_executable,
+                interval=args.interval,
+                stable=args.stable,
+                cooldown=args.cooldown,
+                output_dir=args.output_dir,
+                initial_mode=args.initial_mode,
+                region=args.region,
+                whole_screen=args.whole_screen,
+                log_path=args.log_path,
+                pid_path=args.pid_path,
                 dry_run=args.dry_run,
             )
         if args.command == "mode":
@@ -333,6 +381,48 @@ def _install(
         compile(script_content, str(script_target), "exec")
         print(f"{action} AutoLaunch script: {script_target}")
         print("[ok] AutoLaunch script compiles")
+    return 0
+
+
+def _install_watch_daemon(
+    *,
+    autolaunch_dir: Path,
+    python_executable: str,
+    interval: float,
+    stable: int,
+    cooldown: float,
+    output_dir: Path,
+    initial_mode: str,
+    region: str | None,
+    whole_screen: bool,
+    log_path: Path,
+    pid_path: Path,
+    dry_run: bool,
+) -> int:
+    command = watch_live_command(
+        executable=python_executable,
+        interval=interval,
+        stable=stable,
+        cooldown=cooldown,
+        output_dir=output_dir,
+        initial_mode=initial_mode,
+        iterm_window=not whole_screen and region is None,
+        region=region,
+    )
+    result = install_watch_autolaunch_script(
+        target_dir=autolaunch_dir,
+        command=command,
+        log_path=log_path,
+        pid_path=pid_path,
+        dry_run=dry_run,
+    )
+    compile(result.content, str(result.target), "exec")
+    action = "Would write" if dry_run else "Wrote"
+    print(f"{action} watch AutoLaunch script: {result.target}")
+    print(f"Command: {shell_command(result.command)}")
+    print(f"Log path: {result.log_path.expanduser()}")
+    print(f"PID path: {result.pid_path.expanduser()}")
+    print("[ok] watch AutoLaunch script compiles")
     return 0
 
 
