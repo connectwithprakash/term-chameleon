@@ -69,8 +69,8 @@ def write_e2e_report(report: E2EStageReport) -> tuple[Path, Path]:
         "# Term Chameleon E2E Stage Report",
         "",
         "This stage bundles deterministic visual checks, controlled background artifacts, "
-        "ANSI pattern artifacts, and optional screenshot capture. It is the automated "
-        "staging layer before live iTerm2 window orchestration.",
+        "ANSI pattern artifacts, and optional screenshot capture. It is the permission-light "
+        "staging layer before live GUI staging.",
         "",
         f"- background files: `{len(report.background_files)}`",
         f"- pattern files: `{len(report.pattern_files)}`",
@@ -78,11 +78,11 @@ def write_e2e_report(report: E2EStageReport) -> tuple[Path, Path]:
         f"- screenshot report: `{screenshot_rel}`",
         f"- screenshot captured: `{report.screenshot_captured}`",
         "",
-        "## Next live step",
+        "## Live GUI stage",
         "",
-        "Open `background-html/index.html`, run `pattern/render-pattern.sh` inside iTerm2, "
-        "then capture and analyze the screen. Future automation will drive those window "
-        "operations directly where permissions allow.",
+        "For controlled Safari+iTerm2 orchestration, run `term-chameleon live-stage --dry-run` "
+        "to preview scripts or `term-chameleon live-stage --yes --capture` after granting "
+        "macOS permissions.",
     ]
     md_path.write_text("\n".join(rows) + "\n", encoding="utf-8")
     return json_path, md_path

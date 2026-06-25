@@ -14,6 +14,7 @@ from .adapt import (
     resolve_region,
 )
 from .background_html import open_file, write_background_html
+from .deterministic_check import run_deterministic_check
 from .diagnostics import diagnose
 from .e2e_stage import run_e2e_stage
 from .fixes import fix_file
@@ -116,6 +117,14 @@ def main(argv: list[str] | None = None) -> int:
     visual = sub.add_parser("visual-test", help="Run deterministic visual contrast simulation")
     visual.add_argument("profile", type=Path)
     visual.add_argument("--output-dir", type=Path, default=Path("artifacts/visual-test"))
+
+    check = sub.add_parser(
+        "check",
+        help="Run permission-free deterministic self-checks and write a report",
+    )
+    check.add_argument("--output-dir", type=Path, default=Path("artifacts/check"))
+    check.add_argument("--width", type=int, default=96)
+    check.add_argument("--height", type=int, default=48)
 
     watch_sim = sub.add_parser("watch-sim", help="Simulate dynamic mode selection from samples")
     watch_sim.add_argument(
@@ -290,6 +299,8 @@ def main(argv: list[str] | None = None) -> int:
             return _osc(args.action, args.preset, tmux=args.tmux, shell=args.shell)
         if args.command == "visual-test":
             return _visual_test(args.profile, args.output_dir)
+        if args.command == "check":
+            return _check(output_dir=args.output_dir, width=args.width, height=args.height)
         if args.command == "watch-sim":
             return _watch_sim(args.samples, stable=args.stable)
         if args.command == "watch-live":
@@ -562,6 +573,21 @@ def _visual_test(profile: Path, output_dir: Path) -> int:
             print(f"[fail] {c.background}/{c.style}: {c.contrast:.2f}:1 < {c.threshold:.1f}:1")
         return 1
     print("[ok] visual contrast simulation passed")
+    return 0
+
+
+def _check(*, output_dir: Path, width: int, height: int) -> int:
+    report = run_deterministic_check(output_dir, width=width, height=height)
+    json_path = output_dir / "deterministic-check-report.json"
+    md_path = output_dir / "deterministic-check-report.md"
+    print(f"Wrote: {json_path}")
+    print(f"Wrote: {md_path}")
+    for step in report.steps:
+        marker = "ok" if step.passed else "fail"
+        print(f"[{marker}] {step.name}: {step.detail}")
+    if not report.passed:
+        return 1
+    print("[ok] deterministic self-check passed")
     return 0
 
 

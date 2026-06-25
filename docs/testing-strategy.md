@@ -9,8 +9,9 @@ Term Chameleon should be verifiable without manual supervision for objective cor
 1. Unit tests for colors, contrast, profile parsing, diagnostics, fixes, and mode selection.
 2. CLI tests with fixture profiles.
 3. Integration tests for iTerm2 Dynamic Profile file installation and AutoLaunch script compilation.
-4. Visual tests in deterministic simulation, screenshot/pixel analysis, text-row contrast analysis, and live GUI staging layers.
-5. Dynamic watcher E2E tests with controlled samples, iTerm-window sampling, and hysteresis assertions.
+4. Permission-free deterministic self-check via `term-chameleon check` for post-install smoke validation.
+5. Visual tests in deterministic simulation, screenshot/pixel analysis, text-row contrast analysis, and live GUI staging layers.
+6. Dynamic watcher E2E tests with controlled samples, iTerm-window sampling, and hysteresis assertions.
 
 ## Visual test design
 

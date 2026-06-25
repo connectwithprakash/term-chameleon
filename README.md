@@ -26,6 +26,7 @@ This repository now has an end-to-end MVP for static profile diagnostics, safe p
 - Live GUI staging that arranges controlled Safari background + iTerm2 ANSI pattern windows and can optionally capture/analyze the result with text-row contrast and pixel-cluster fallback.
 - macOS `screencapture` probe and screenshot-test artifact foundation for screenshot-based visual tests.
 - Long-running daemon packaging for continuous adaptation.
+- Permission-free deterministic self-check command for post-install validation.
 - Fixture tests for good and bad iTerm2 profiles.
 
 Optional future refinements:
@@ -34,6 +35,12 @@ Optional future refinements:
 - Add broader terminal emulator support beyond iTerm2.
 
 ## CLI examples
+
+Run a permission-free deterministic self-check after installation or before live GUI tests:
+
+```bash
+term-chameleon check --output-dir artifacts/check
+```
 
 Install a balanced preset into a target directory:
 

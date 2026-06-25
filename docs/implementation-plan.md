@@ -69,6 +69,7 @@ Implemented:
 - Screenshot-test foundation: controlled PPM background artifacts, luminance/variance/risk classification, optional real macOS screenshot capture, PNG screenshot luminance/variance analysis.
 - Screenshot pixel contrast estimator: darkest/lightest cluster contrast reports for captured PNG/PPM artifacts.
 - Text-row/glyph-aware contrast estimator: detects high-delta text-like rows and estimates glyph/background contrast.
+- Permission-free deterministic self-check: `term-chameleon check` generates a built-in balanced profile, runs doctor, E2E staging, pixel contrast, text-row contrast, and watcher hysteresis checks, then writes JSON/Markdown reports.
 - Controlled HTML backgrounds for browser/window staging.
 - Terminal ANSI pattern script artifacts.
 - Live GUI staging: `term-chameleon live-stage` arranges Safari controlled-background and iTerm2 ANSI-pattern windows, then optionally captures/analyzes screenshot region contrast using text-row contrast when detectable and pixel-cluster fallback otherwise.
