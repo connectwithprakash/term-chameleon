@@ -6,7 +6,7 @@ Glassy terminal themes look good until white text disappears over a bright windo
 
 ## Current status
 
-This repository is prepared as `v0.1.0-alpha.3` / Python package version `0.1.0a3`: an end-to-end alpha for static profile diagnostics, safe profile mutation, deterministic visual artifacts, live iTerm2 adaptation, and controlled macOS GUI/screenshot QA. Implemented:
+This repository is prepared as `v0.1.0-alpha.4` / Python package version `0.1.0a4`: an end-to-end alpha for static profile diagnostics, safe profile mutation, deterministic visual artifacts, live iTerm2 adaptation, and controlled macOS GUI/screenshot QA. Implemented:
 
 - iTerm2 Dynamic Profile JSON parsing.
 - Color conversion between hex and iTerm2 color dictionaries.
@@ -29,6 +29,7 @@ This repository is prepared as `v0.1.0-alpha.3` / Python package version `0.1.0a
 - Permission-free deterministic self-check command for post-install validation.
 - Local readiness status command with human and JSON output.
 - Guided setup command that runs deterministic checks and optionally installs the default profile.
+- TOML config example and `--config` support for setup/watch-live/watch daemon flows.
 - Fixture tests for good and bad iTerm2 profiles.
 
 Optional future refinements:
@@ -43,7 +44,7 @@ Build and install the alpha wheel locally:
 ```bash
 uv build
 python3 -m venv /tmp/term-chameleon-alpha-venv
-/tmp/term-chameleon-alpha-venv/bin/pip install dist/term_chameleon-0.1.0a3-py3-none-any.whl
+/tmp/term-chameleon-alpha-venv/bin/pip install dist/term_chameleon-0.1.0a4-py3-none-any.whl
 /tmp/term-chameleon-alpha-venv/bin/term-chameleon check --output-dir /tmp/term-chameleon-alpha-check
 ```
 
@@ -58,12 +59,16 @@ term-chameleon check --output-dir artifacts/check
 term-chameleon setup
 term-chameleon setup --yes
 term-chameleon setup --live
+term-chameleon config-example --output ~/.config/term-chameleon/config.toml
+term-chameleon watch-live --config ~/.config/term-chameleon/config.toml --dry-run
 term-chameleon status
 term-chameleon status --live
 term-chameleon status --json
 ```
 
 `setup` is a guided flow: it runs deterministic checks and reports status. On first run, bare `setup` exits nonzero until a healthy profile exists; use `setup --yes` to install the generated profile, and `setup --live` to include live iTerm2 API/window readiness.
+
+`config-example` prints a commented TOML file. `watch-live`, `install-watch-daemon`, and `setup` accept `--config`; explicit CLI flags override config values.
 
 Install a balanced preset into a target directory:
 

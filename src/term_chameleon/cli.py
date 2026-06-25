@@ -14,6 +14,18 @@ from .adapt import (
     resolve_region,
 )
 from .background_html import open_file, write_background_html
+from .config import (
+    EXAMPLE_CONFIG,
+    ConfigError,
+    bool_value,
+    float_value,
+    int_value,
+    load_config,
+    merged_section,
+    path_value,
+    str_value,
+    value,
+)
 from .deterministic_check import run_deterministic_check
 from .diagnostics import diagnose
 from .e2e_stage import run_e2e_stage
@@ -82,17 +94,18 @@ def main(argv: list[str] | None = None) -> int:
         "install-watch-daemon",
         help="Install an iTerm2 AutoLaunch script that starts watch-live",
     )
-    install_watch.add_argument("--autolaunch-dir", type=Path, default=DEFAULT_AUTOLAUNCH_DIR)
-    install_watch.add_argument("--python", dest="python_executable", default=sys.executable)
-    install_watch.add_argument("--interval", type=float, default=2.0)
-    install_watch.add_argument("--stable", type=int, default=3)
-    install_watch.add_argument("--cooldown", type=float, default=10.0)
+    install_watch.add_argument("--config", type=Path, help="TOML config file")
+    install_watch.add_argument("--autolaunch-dir", type=Path, default=None)
+    install_watch.add_argument("--python", dest="python_executable", default=None)
+    install_watch.add_argument("--interval", type=float, default=None)
+    install_watch.add_argument("--stable", type=int, default=None)
+    install_watch.add_argument("--cooldown", type=float, default=None)
     install_watch.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("~/Library/Logs/term-chameleon/watch-live-artifacts"),
+        default=None,
     )
-    install_watch.add_argument("--initial-mode", choices=sorted(PRESETS), default="balanced")
+    install_watch.add_argument("--initial-mode", choices=sorted(PRESETS), default=None)
     daemon_region = install_watch.add_mutually_exclusive_group()
     daemon_region.add_argument("--region", help="Screen region as x,y,width,height")
     daemon_region.add_argument(
@@ -100,8 +113,8 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Sample the whole screen instead of the iTerm window",
     )
-    install_watch.add_argument("--log-path", type=Path, default=DEFAULT_LOG_PATH)
-    install_watch.add_argument("--pid-path", type=Path, default=DEFAULT_PID_PATH)
+    install_watch.add_argument("--log-path", type=Path, default=None)
+    install_watch.add_argument("--pid-path", type=Path, default=None)
     install_watch.add_argument("--dry-run", action="store_true")
 
     mode = sub.add_parser("mode", help="Apply a readability mode/preset to a profile JSON file")
@@ -140,12 +153,16 @@ def main(argv: list[str] | None = None) -> int:
         "setup",
         help="Run guided local setup checks and optionally install the default profile",
     )
-    setup.add_argument("--output-dir", type=Path, default=Path("artifacts/setup"))
+    setup.add_argument("--config", type=Path, help="TOML config file")
+    setup.add_argument("--output-dir", type=Path, default=None)
     setup.add_argument("--profile", type=Path, help="Dynamic Profile JSON path to inspect/install")
-    setup.add_argument("--preset", choices=sorted(PRESETS), default="balanced")
-    setup.add_argument("--name", default="Adaptive Glass Alpha")
+    setup.add_argument("--preset", choices=sorted(PRESETS), default=None)
+    setup.add_argument("--name", default=None)
     setup.add_argument("--yes", action="store_true", help="Install the generated profile if needed")
     setup.add_argument("--live", action="store_true", help="Probe live iTerm2 API/window bounds")
+
+    config_example = sub.add_parser("config-example", help="Print an example TOML config")
+    config_example.add_argument("--output", type=Path, help="Write config example to a file")
 
     watch_sim = sub.add_parser("watch-sim", help="Simulate dynamic mode selection from samples")
     watch_sim.add_argument(
@@ -158,12 +175,13 @@ def main(argv: list[str] | None = None) -> int:
     watch_live = sub.add_parser(
         "watch-live", help="Continuously sample the screen and adapt current iTerm2 session"
     )
-    watch_live.add_argument("--interval", type=float, default=2.0)
-    watch_live.add_argument("--duration", type=float, default=60.0)
-    watch_live.add_argument("--stable", type=int, default=3)
-    watch_live.add_argument("--cooldown", type=float, default=10.0)
-    watch_live.add_argument("--output-dir", type=Path, default=Path("artifacts/watch-live"))
-    watch_live.add_argument("--initial-mode", choices=sorted(PRESETS), default="balanced")
+    watch_live.add_argument("--config", type=Path, help="TOML config file")
+    watch_live.add_argument("--interval", type=float, default=None)
+    watch_live.add_argument("--duration", type=float, default=None)
+    watch_live.add_argument("--stable", type=int, default=None)
+    watch_live.add_argument("--cooldown", type=float, default=None)
+    watch_live.add_argument("--output-dir", type=Path, default=None)
+    watch_live.add_argument("--initial-mode", choices=sorted(PRESETS), default=None)
     region_group = watch_live.add_mutually_exclusive_group()
     region_group.add_argument("--region", help="Screen region as x,y,width,height")
     region_group.add_argument(
@@ -313,6 +331,7 @@ def main(argv: list[str] | None = None) -> int:
                 log_path=args.log_path,
                 pid_path=args.pid_path,
                 dry_run=args.dry_run,
+                config=args.config,
             )
         if args.command == "mode":
             return _mode(args.profile, args.preset, dry_run=args.dry_run, yes=args.yes)
@@ -332,7 +351,10 @@ def main(argv: list[str] | None = None) -> int:
                 name=args.name,
                 yes=args.yes,
                 live=args.live,
+                config=args.config,
             )
+        if args.command == "config-example":
+            return _config_example(output=args.output)
         if args.command == "watch-sim":
             return _watch_sim(args.samples, stable=args.stable)
         if args.command == "watch-live":
@@ -347,6 +369,7 @@ def main(argv: list[str] | None = None) -> int:
                 iterm_window=args.iterm_window,
                 dry_run=args.dry_run,
                 yes=args.yes,
+                config=args.config,
             )
         if args.command == "iterm-api-check":
             return _iterm_api_check()
@@ -528,34 +551,58 @@ def _install(
 
 def _install_watch_daemon(
     *,
-    autolaunch_dir: Path,
-    python_executable: str,
-    interval: float,
-    stable: int,
-    cooldown: float,
-    output_dir: Path,
-    initial_mode: str,
+    autolaunch_dir: Path | None,
+    python_executable: str | None,
+    interval: float | None,
+    stable: int | None,
+    cooldown: float | None,
+    output_dir: Path | None,
+    initial_mode: str | None,
     region: str | None,
     whole_screen: bool,
-    log_path: Path,
-    pid_path: Path,
+    log_path: Path | None,
+    pid_path: Path | None,
     dry_run: bool,
+    config: Path | None,
 ) -> int:
+    cfg = load_config(config)
+    daemon_cfg = merged_section(cfg, "daemon", fallback="watch")
+    resolved_region = region if region is not None else str_value(value(daemon_cfg, "region"))
+    resolved_iterm_window = bool_value(value(daemon_cfg, "iterm_window"), True)
+    if whole_screen:
+        resolved_iterm_window = False
+        resolved_region = None
+    daemon_interval = (
+        interval if interval is not None else float_value(value(daemon_cfg, "interval"), 2.0)
+    )
+    daemon_stable = stable if stable is not None else int_value(value(daemon_cfg, "stable"), 3)
+    daemon_cooldown = (
+        cooldown if cooldown is not None else float_value(value(daemon_cfg, "cooldown"), 10.0)
+    )
+    daemon_output_dir = output_dir or path_value(
+        value(daemon_cfg, "output_dir"),
+        Path("~/Library/Logs/term-chameleon/watch-live-artifacts"),
+    )
+    daemon_initial_mode = _preset_or_error(
+        initial_mode or str_value(value(daemon_cfg, "initial_mode")), "balanced"
+    )
+    daemon_python = python_executable or str_value(value(daemon_cfg, "python")) or sys.executable
     command = watch_live_command(
-        executable=python_executable,
-        interval=interval,
-        stable=stable,
-        cooldown=cooldown,
-        output_dir=output_dir,
-        initial_mode=initial_mode,
-        iterm_window=not whole_screen and region is None,
-        region=region,
+        executable=daemon_python,
+        interval=daemon_interval,
+        stable=daemon_stable,
+        cooldown=daemon_cooldown,
+        output_dir=daemon_output_dir,
+        initial_mode=daemon_initial_mode,
+        iterm_window=resolved_iterm_window and resolved_region is None,
+        region=resolved_region,
     )
     result = install_watch_autolaunch_script(
-        target_dir=autolaunch_dir,
+        target_dir=autolaunch_dir
+        or path_value(value(daemon_cfg, "autolaunch_dir"), DEFAULT_AUTOLAUNCH_DIR),
         command=command,
-        log_path=log_path,
-        pid_path=pid_path,
+        log_path=log_path or path_value(value(daemon_cfg, "log_path"), DEFAULT_LOG_PATH),
+        pid_path=pid_path or path_value(value(daemon_cfg, "pid_path"), DEFAULT_PID_PATH),
         dry_run=dry_run,
     )
     compile(result.content, str(result.target), "exec")
@@ -644,23 +691,28 @@ def _status(*, profile: Path | None, live: bool, json_output: bool) -> int:
 
 def _setup(
     *,
-    output_dir: Path,
+    output_dir: Path | None,
     profile: Path | None,
-    preset: str,
-    name: str,
+    preset: str | None,
+    name: str | None,
     yes: bool,
     live: bool,
+    config: Path | None,
 ) -> int:
+    cfg = load_config(config)
+    setup_cfg = merged_section(cfg, "setup")
+    output = output_dir or path_value(value(setup_cfg, "output_dir"), Path("artifacts/setup"))
+    config_live = bool_value(value(setup_cfg, "live"), False)
     report = run_setup(
-        output_dir=output_dir,
+        output_dir=output,
         yes=yes,
-        live=live,
-        profile_path=profile,
-        preset=preset,
-        name=name,
+        live=live or config_live,
+        profile_path=profile or path_value(value(setup_cfg, "profile")),
+        preset=preset or str_value(value(setup_cfg, "preset"), "balanced"),
+        name=name or str_value(value(setup_cfg, "name"), "Adaptive Glass Alpha"),
     )
-    print(f"Wrote: {output_dir / 'deterministic-check-report.json'}")
-    print(f"Wrote: {output_dir / 'deterministic-check-report.md'}")
+    print(f"Wrote: {output / 'deterministic-check-report.json'}")
+    print(f"Wrote: {output / 'deterministic-check-report.md'}")
     for step in report.check_report.steps:
         marker = "ok" if step.passed else "fail"
         print(f"[{marker}] check/{step.name}: {step.detail}")
@@ -678,6 +730,16 @@ def _setup(
     return 0 if report.passed else 1
 
 
+def _config_example(*, output: Path | None) -> int:
+    if output is None:
+        print(EXAMPLE_CONFIG, end="")
+    else:
+        output.expanduser().parent.mkdir(parents=True, exist_ok=True)
+        output.expanduser().write_text(EXAMPLE_CONFIG, encoding="utf-8")
+        print(f"Wrote: {output.expanduser()}")
+    return 0
+
+
 def _watch_sim(samples: list[str], *, stable: int) -> int:
     selector = ModeSelector(stable_samples_required=stable)
     for index, raw in enumerate(samples, start=1):
@@ -693,32 +755,59 @@ def _watch_sim(samples: list[str], *, stable: int) -> int:
 
 def _watch_live(
     *,
-    interval: float,
-    duration: float,
-    stable: int,
-    cooldown: float,
-    output_dir: Path,
-    initial_mode: str,
+    interval: float | None,
+    duration: float | None,
+    stable: int | None,
+    cooldown: float | None,
+    output_dir: Path | None,
+    initial_mode: str | None,
     region: str | None,
     iterm_window: bool,
     dry_run: bool,
     yes: bool,
+    config: Path | None,
 ) -> int:
     if not dry_run and not yes:
         print("Refusing to mutate iTerm2 without --yes. Use --dry-run to preview.", file=sys.stderr)
         return 2
-    config = WatchLiveConfig(
-        interval=interval,
-        duration=duration,
-        stable=stable,
-        cooldown=cooldown,
-        output_dir=output_dir,
-        dry_run=dry_run,
-        initial_mode=initial_mode,
-        region=Region.parse(region) if region else None,
-        iterm_window=iterm_window,
+    cfg = load_config(config)
+    watch_cfg = merged_section(cfg, "watch")
+    resolved_region = region if region is not None else str_value(value(watch_cfg, "region"))
+    if iterm_window:
+        resolved_region = None
+        resolved_iterm_window = True
+    else:
+        resolved_iterm_window = bool_value(value(watch_cfg, "iterm_window"), False)
+        if resolved_region is not None:
+            resolved_iterm_window = False
+    watch_interval = (
+        interval if interval is not None else float_value(value(watch_cfg, "interval"), 2.0)
     )
-    events = run_watch_live(config)
+    watch_duration = (
+        duration if duration is not None else float_value(value(watch_cfg, "duration"), 60.0)
+    )
+    watch_stable = stable if stable is not None else int_value(value(watch_cfg, "stable"), 3)
+    watch_cooldown = (
+        cooldown if cooldown is not None else float_value(value(watch_cfg, "cooldown"), 10.0)
+    )
+    watch_output_dir = output_dir or path_value(
+        value(watch_cfg, "output_dir"), Path("artifacts/watch-live")
+    )
+    watch_initial_mode = _preset_or_error(
+        initial_mode or str_value(value(watch_cfg, "initial_mode")), "balanced"
+    )
+    config_obj = WatchLiveConfig(
+        interval=watch_interval,
+        duration=watch_duration,
+        stable=watch_stable,
+        cooldown=watch_cooldown,
+        output_dir=watch_output_dir,
+        dry_run=dry_run,
+        initial_mode=watch_initial_mode,
+        region=Region.parse(resolved_region) if resolved_region else None,
+        iterm_window=resolved_iterm_window,
+    )
+    events = run_watch_live(config_obj)
     for event in events:
         marker = "switch" if event.switched else "hold"
         apply_marker = " applied" if event.applied else ""
@@ -1038,6 +1127,13 @@ def _require_path(path: Path | None) -> Path:
     if path is None:
         raise ValueError("image path is required")
     return path
+
+
+def _preset_or_error(value: str | None, default: str) -> str:
+    resolved = value or default
+    if resolved not in PRESETS:
+        raise ConfigError(f"unknown preset/mode in config: {resolved!r}")
+    return resolved
 
 
 def _parse_sample(raw: str) -> Sample:

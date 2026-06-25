@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.0a4 - 2026-06-25
+
+### Added
+
+- `term-chameleon config-example` for generating a documented TOML config.
+- `--config` support for `setup`, `watch-live`, and `install-watch-daemon`.
+- Config-driven watcher, daemon, and setup defaults with explicit CLI flags taking precedence.
+
 ## 0.1.0a3 - 2026-06-25
 
 ### Added
