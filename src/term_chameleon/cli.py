@@ -114,6 +114,11 @@ def main(argv: list[str] | None = None) -> int:
     daemon_region = install_watch.add_mutually_exclusive_group()
     daemon_region.add_argument("--region", help="Screen region as x,y,width,height")
     daemon_region.add_argument(
+        "--iterm-window",
+        action="store_true",
+        help="Sample the front iTerm2 window instead of the whole screen",
+    )
+    daemon_region.add_argument(
         "--whole-screen",
         action="store_true",
         help="Sample the whole screen instead of the iTerm window",
@@ -383,6 +388,7 @@ def main(argv: list[str] | None = None) -> int:
                 output_dir=args.output_dir,
                 initial_mode=args.initial_mode,
                 region=args.region,
+                iterm_window=args.iterm_window,
                 whole_screen=args.whole_screen,
                 log_path=args.log_path,
                 pid_path=args.pid_path,
@@ -645,6 +651,7 @@ def _install_watch_daemon(
     output_dir: Path | None,
     initial_mode: str | None,
     region: str | None,
+    iterm_window: bool,
     whole_screen: bool,
     log_path: Path | None,
     pid_path: Path | None,
@@ -654,10 +661,16 @@ def _install_watch_daemon(
     cfg = load_config(config)
     daemon_cfg = merged_section(cfg, "daemon", fallback="watch")
     resolved_region = region if region is not None else str_value(value(daemon_cfg, "region"))
-    resolved_iterm_window = bool_value(value(daemon_cfg, "iterm_window"), True)
-    if whole_screen:
+    if iterm_window:
+        resolved_iterm_window = True
+        resolved_region = None
+    elif whole_screen:
         resolved_iterm_window = False
         resolved_region = None
+    elif resolved_region is not None:
+        resolved_iterm_window = False
+    else:
+        resolved_iterm_window = bool_value(value(daemon_cfg, "iterm_window"), False)
     daemon_interval = (
         interval if interval is not None else float_value(value(daemon_cfg, "interval"), 2.0)
     )

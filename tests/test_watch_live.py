@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from term_chameleon.images import Region
+from term_chameleon.iterm_window import WindowBoundsResult
 from term_chameleon.live_iterm import LiveApplyResult
 from term_chameleon.watch import Sample
 from term_chameleon.watch_live import WatchLiveConfig, run_watch_live
@@ -129,3 +130,71 @@ def test_watch_live_passes_region_to_sample_provider(tmp_path):
         clock=clock,
     )
     assert seen == [region]
+
+
+def test_watch_live_waits_for_iterm_window_before_sampling(tmp_path):
+    calls = []
+    seen_regions = []
+    clock = FakeClock()
+    region = Region(5, 6, 7, 8)
+
+    def bounds_provider():
+        calls.append(clock.now)
+        if len(calls) < 3:
+            return WindowBoundsResult(False, None, "iTerm2 has no windows")
+        return WindowBoundsResult(True, region, "ok")
+
+    def provider(_index: int, _output_dir: Path, sample_region):
+        seen_regions.append(sample_region)
+        return Sample(0.2), "sample"
+
+    events = run_watch_live(
+        WatchLiveConfig(
+            interval=1,
+            duration=0.1,
+            stable=1,
+            cooldown=10,
+            output_dir=tmp_path,
+            dry_run=True,
+            initial_mode="balanced",
+            iterm_window=True,
+        ),
+        sample_provider=provider,
+        sleep=clock.sleep,
+        clock=clock,
+        window_bounds_provider=bounds_provider,
+    )
+
+    assert len(calls) == 3
+    assert seen_regions == [region]
+    assert len(events) == 1
+
+
+def test_watch_live_window_wait_times_out(tmp_path):
+    clock = FakeClock()
+
+    def bounds_provider():
+        return WindowBoundsResult(False, None, "iTerm2 has no windows")
+
+    try:
+        run_watch_live(
+            WatchLiveConfig(
+                interval=1,
+                duration=2,
+                stable=1,
+                cooldown=10,
+                output_dir=tmp_path,
+                dry_run=True,
+                initial_mode="balanced",
+                iterm_window=True,
+            ),
+            sample_provider=lambda _index, _output_dir, _region: (Sample(0.2), "sample"),
+            sleep=clock.sleep,
+            clock=clock,
+            window_bounds_provider=bounds_provider,
+        )
+    except RuntimeError as exc:
+        assert "after 60.0s" in str(exc)
+        assert "iTerm2 has no windows" in str(exc)
+    else:
+        raise AssertionError("expected RuntimeError")

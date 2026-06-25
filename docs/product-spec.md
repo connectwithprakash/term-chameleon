@@ -54,7 +54,7 @@ Installs iTerm2 Dynamic Profile JSON under:
 ~/Library/Application Support/iTerm2/DynamicProfiles/
 ```
 
-`install-watch-daemon` installs an iTerm2 AutoLaunch script under the user's AutoLaunch scripts directory so `watch-live --yes --iterm-window` can start when iTerm2 launches.
+`install-watch-daemon` installs an iTerm2 AutoLaunch script under the user's AutoLaunch scripts directory so `watch-live --yes` can start when iTerm2 launches. The daemon samples the whole screen by default for startup robustness; pass `install-watch-daemon --iterm-window` after validating local Accessibility/iTerm2 startup behavior if front-window-scoped sampling is preferred.
 
 ### Visual test harness
 

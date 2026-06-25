@@ -59,7 +59,15 @@ def test_config_check_cli_success_json(tmp_path, capsys):
     assert main(["config-check", "--config", str(config_path), "--json"]) == 0
     out = capsys.readouterr().out
     assert '"passed": true' in out
-    assert '"errors": []' in out
+    assert '"sections"' in out
+
+
+def test_example_config_daemon_defaults_to_whole_screen(tmp_path, capsys):
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(EXAMPLE_CONFIG, encoding="utf-8")
+    assert main(["install-watch-daemon", "--config", str(config_path), "--dry-run"]) == 0
+    out = capsys.readouterr().out
+    assert "--iterm-window" not in out
 
 
 def test_config_check_cli_validation_failure(tmp_path, capsys):

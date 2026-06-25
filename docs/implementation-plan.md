@@ -133,10 +133,12 @@ Implemented:
 - `term-chameleon watch-daemon-status` and `uninstall-watch-daemon` complete the AutoLaunch lifecycle.
 - `term-chameleon release-check` is the top-level local release-readiness gate, composing deterministic self-checks, optional config validation, status/live readiness, optional daemon health, and optional controlled live-stage screenshot QA into JSON/Markdown reports.
 
-Acceptance:
+## Milestone 9: beta dogfood hardening
 
-```bash
-uv run --extra dev ruff check .
-uv run --extra dev pytest -q
-uv run term-chameleon release-check --output-dir /tmp/term-chameleon-release-check --live --live-stage
-```
+Implemented/verified:
+
+- Built and installed the wheel into a fresh venv.
+- Ran `setup --yes` and live `release-check --live --live-stage` successfully.
+- Installed the real iTerm2 AutoLaunch watcher daemon, restarted iTerm2, fixed startup timing so `watch-live --iterm-window` waits for the first window instead of exiting, and verified one running watcher process with healthy daemon status.
+- Observed watcher screenshot sample artifacts over a sustained run.
+- Promoted release metadata to `0.1.0b1` / `v0.1.0-beta.1`.

@@ -73,7 +73,7 @@ def watch_live_command(
     cooldown: float = 10.0,
     output_dir: Path = Path("~/Library/Logs/term-chameleon/watch-live-artifacts"),
     initial_mode: str = "balanced",
-    iterm_window: bool = True,
+    iterm_window: bool = False,
     region: str | None = None,
 ) -> tuple[str, ...]:
     command = [

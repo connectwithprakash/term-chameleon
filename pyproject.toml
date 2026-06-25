@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "term-chameleon"
-version = "0.1.0a7"
+version = "0.1.0b1"
 description = "Adaptive contrast/readability toolkit for translucent terminals, starting with iTerm2."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -12,7 +12,7 @@ license = { text = "MIT" }
 authors = [{ name = "Term Chameleon contributors" }]
 keywords = ["terminal", "iterm2", "contrast", "accessibility", "transparency", "osc"]
 classifiers = [
-  "Development Status :: 3 - Alpha",
+  "Development Status :: 4 - Beta",
   "Environment :: Console",
   "Intended Audience :: Developers",
   "License :: OSI Approved :: MIT License",

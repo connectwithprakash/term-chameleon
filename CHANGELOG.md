@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.1.0b1 - 2026-06-25
+
+### Changed
+
+- AutoLaunch-launched `watch-live --iterm-window` now waits briefly for iTerm2 to create a window instead of exiting immediately during app startup.
+- `install-watch-daemon` now defaults to whole-screen sampling for startup robustness and exposes `--iterm-window` as an explicit opt-in.
+- Promoted package metadata to beta after real AutoLaunch daemon dogfood.
+- Updated README with beta install/use path and daemon restart guidance.
+
+### Verified
+
+- Installed the wheel into a fresh venv, ran `setup --yes`, `release-check --live --live-stage`, and installed the real iTerm2 AutoLaunch watcher.
+- Restarted iTerm2 and verified exactly one long-running watcher process from the AutoLaunch script.
+- Confirmed daemon status stayed healthy and watcher screenshot sample artifacts were written.
+
 ## 0.1.0a7 - 2026-06-25
 
 ### Added

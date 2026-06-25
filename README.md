@@ -6,7 +6,7 @@ Glassy terminal themes look good until white text disappears over a bright windo
 
 ## Current status
 
-This repository is prepared as `v0.1.0-alpha.7` / Python package version `0.1.0a7`: an end-to-end alpha for static profile diagnostics, safe profile mutation, deterministic visual artifacts, live iTerm2 adaptation, and controlled macOS GUI/screenshot QA. Implemented:
+This repository is prepared as `v0.1.0-beta.1` / Python package version `0.1.0b1`: a dogfooded beta for static profile diagnostics, safe profile mutation, deterministic visual artifacts, live iTerm2 adaptation, controlled macOS GUI/screenshot QA, and real iTerm2 AutoLaunch watcher operation. Implemented:
 
 - iTerm2 Dynamic Profile JSON parsing.
 - Color conversion between hex and iTerm2 color dictionaries.
@@ -39,19 +39,35 @@ Optional future refinements:
 - Replace heuristic text-row detection with OCR/terminal-cell-aware glyph segmentation.
 - Add broader terminal emulator support beyond iTerm2.
 
-## Alpha release verification
+## Beta release verification
 
-Build and install the alpha wheel locally:
+Build and install the beta wheel locally:
 
 ```bash
 uv build
-python3 -m venv /tmp/term-chameleon-alpha-venv
-/tmp/term-chameleon-alpha-venv/bin/pip install 'dist/term_chameleon-0.1.0a7-py3-none-any.whl[iterm]'
-/tmp/term-chameleon-alpha-venv/bin/term-chameleon setup --yes
-/tmp/term-chameleon-alpha-venv/bin/term-chameleon release-check --output-dir /tmp/term-chameleon-alpha-release-check
+python3 -m venv /tmp/term-chameleon-beta-venv
+/tmp/term-chameleon-beta-venv/bin/pip install 'dist/term_chameleon-0.1.0b1-py3-none-any.whl[iterm]'
+/tmp/term-chameleon-beta-venv/bin/term-chameleon setup --yes
+/tmp/term-chameleon-beta-venv/bin/term-chameleon release-check --output-dir /tmp/term-chameleon-beta-release-check
+/tmp/term-chameleon-beta-venv/bin/term-chameleon release-check --output-dir /tmp/term-chameleon-beta-live-check --live --live-stage --threshold 1.0
 ```
 
+The real iTerm2 AutoLaunch watcher was dogfooded for this beta by installing the daemon, restarting iTerm2, verifying a single running watcher process, checking daemon status, and confirming screenshot sample artifacts were written.
+
 See [CHANGELOG.md](CHANGELOG.md) for release notes.
+
+## Use it
+
+```bash
+python3 -m venv ~/.local/share/term-chameleon/venv
+~/.local/share/term-chameleon/venv/bin/pip install 'term-chameleon[iterm]'
+~/.local/share/term-chameleon/venv/bin/term-chameleon setup --yes
+~/.local/share/term-chameleon/venv/bin/term-chameleon release-check --live --live-stage --threshold 1.0
+~/.local/share/term-chameleon/venv/bin/term-chameleon install-watch-daemon
+~/.local/share/term-chameleon/venv/bin/term-chameleon watch-daemon-status
+```
+
+Restart iTerm2 after installing the daemon. The AutoLaunch script starts one long-running `watch-live` process and records its pid/log paths; use `watch-daemon-status` to inspect it and `uninstall-watch-daemon` to remove the AutoLaunch script. The daemon samples the whole screen by default for startup robustness; pass `install-watch-daemon --iterm-window` if you prefer front-iTerm-window sampling after confirming Accessibility/iTerm2 API startup behavior on your machine.
 
 ## CLI examples
 

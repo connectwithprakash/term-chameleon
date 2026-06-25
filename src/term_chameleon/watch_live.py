@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .images import Region
-from .iterm_window import get_iterm_window_bounds
+from .iterm_window import WindowBoundsResult, get_iterm_window_bounds
 from .live_iterm import LiveApplyResult, apply_preset_to_current_session
 from .screenshot import capture_screen
 from .screenshot_test import analyze_image_file
@@ -57,6 +57,7 @@ SampleProvider = Callable[[int, Path, Region | None], tuple[Sample, str]]
 ApplyPreset = Callable[[str], LiveApplyResult]
 Sleep = Callable[[float], None]
 Clock = Callable[[], float]
+WindowBoundsProvider = Callable[[], WindowBoundsResult]
 
 
 def screenshot_sample_provider(
@@ -81,16 +82,17 @@ def run_watch_live(
     apply_preset: ApplyPreset = apply_preset_to_current_session,
     sleep: Sleep = time.sleep,
     clock: Clock = time.monotonic,
+    window_bounds_provider: WindowBoundsProvider = get_iterm_window_bounds,
 ) -> list[WatchLiveEvent]:
     selector = ModeSelector(current_mode=config.initial_mode, stable_samples_required=config.stable)
     region = config.region
     if config.iterm_window:
-        result = get_iterm_window_bounds()
-        if not result.available or result.region is None:
-            raise RuntimeError(
-                f"could not read iTerm2 window bounds: {result.message}; use --region x,y,w,h"
-            )
-        region = result.region
+        region = _wait_for_iterm_window_bounds(
+            interval=config.interval,
+            sleep=sleep,
+            clock=clock,
+            window_bounds_provider=window_bounds_provider,
+        )
     start = clock()
     next_allowed_switch = start
     events: list[WatchLiveEvent] = []
@@ -147,3 +149,26 @@ def run_watch_live(
         sleep(config.interval)
 
     return events
+
+
+def _wait_for_iterm_window_bounds(
+    *,
+    interval: float,
+    sleep: Sleep,
+    clock: Clock,
+    window_bounds_provider: WindowBoundsProvider,
+) -> Region:
+    wait_limit = 60.0
+    start = clock()
+    last_message = "iTerm2 window bounds unavailable"
+    while True:
+        result = window_bounds_provider()
+        if result.available and result.region is not None:
+            return result.region
+        last_message = result.message
+        if clock() - start >= wait_limit:
+            raise RuntimeError(
+                f"could not read iTerm2 window bounds after {wait_limit:.1f}s: "
+                f"{last_message}; use --region x,y,w,h"
+            )
+        sleep(min(interval, 1.0))

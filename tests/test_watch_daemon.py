@@ -11,15 +11,18 @@ from term_chameleon.watch_daemon import (
 )
 
 
-def test_watch_live_command_defaults_to_iterm_window():
+def test_watch_live_command_defaults_to_whole_screen():
     command = watch_live_command(executable="/tmp/python", interval=1, stable=2, cooldown=3)
     assert command[:4] == ("/tmp/python", "-m", "term_chameleon.cli", "watch-live")
     assert "--yes" in command
-    assert "--iterm-window" in command
+    assert "--iterm-window" not in command
+    assert "--region" not in command
     assert "--duration" in command
 
 
-def test_watch_live_command_supports_region_and_whole_screen():
+def test_watch_live_command_supports_iterm_window_region_and_whole_screen():
+    iterm_command = watch_live_command(executable="python", iterm_window=True)
+    assert "--iterm-window" in iterm_command
     region_command = watch_live_command(executable="python", region="1,2,3,4")
     assert "--region" in region_command
     assert "--iterm-window" not in region_command
@@ -155,8 +158,27 @@ def test_install_watch_daemon_cli_dry_run(tmp_path, capsys):
     )
     out = capsys.readouterr().out
     assert "Would write watch AutoLaunch script" in out
-    assert "--iterm-window" in out
+    assert "--iterm-window" not in out
     assert not (tmp_path / "term_chameleon_watch_live.py").exists()
+
+
+def test_install_watch_daemon_cli_iterm_window_opt_in(tmp_path, capsys):
+    assert (
+        main(
+            [
+                "install-watch-daemon",
+                "--autolaunch-dir",
+                str(tmp_path),
+                "--python",
+                "/tmp/python",
+                "--iterm-window",
+                "--dry-run",
+            ]
+        )
+        == 0
+    )
+    out = capsys.readouterr().out
+    assert "--iterm-window" in out
 
 
 def test_watch_daemon_status_cli_json(tmp_path, capsys):
