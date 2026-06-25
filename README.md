@@ -6,7 +6,7 @@ Glassy terminal themes look good until white text disappears over a bright windo
 
 ## Current status
 
-This repository is prepared as `v0.1.0-alpha.2` / Python package version `0.1.0a2`: an end-to-end alpha for static profile diagnostics, safe profile mutation, deterministic visual artifacts, live iTerm2 adaptation, and controlled macOS GUI/screenshot QA. Implemented:
+This repository is prepared as `v0.1.0-alpha.3` / Python package version `0.1.0a3`: an end-to-end alpha for static profile diagnostics, safe profile mutation, deterministic visual artifacts, live iTerm2 adaptation, and controlled macOS GUI/screenshot QA. Implemented:
 
 - iTerm2 Dynamic Profile JSON parsing.
 - Color conversion between hex and iTerm2 color dictionaries.
@@ -28,6 +28,7 @@ This repository is prepared as `v0.1.0-alpha.2` / Python package version `0.1.0a
 - Long-running daemon packaging for continuous adaptation.
 - Permission-free deterministic self-check command for post-install validation.
 - Local readiness status command with human and JSON output.
+- Guided setup command that runs deterministic checks and optionally installs the default profile.
 - Fixture tests for good and bad iTerm2 profiles.
 
 Optional future refinements:
@@ -42,7 +43,7 @@ Build and install the alpha wheel locally:
 ```bash
 uv build
 python3 -m venv /tmp/term-chameleon-alpha-venv
-/tmp/term-chameleon-alpha-venv/bin/pip install dist/term_chameleon-0.1.0a2-py3-none-any.whl
+/tmp/term-chameleon-alpha-venv/bin/pip install dist/term_chameleon-0.1.0a3-py3-none-any.whl
 /tmp/term-chameleon-alpha-venv/bin/term-chameleon check --output-dir /tmp/term-chameleon-alpha-check
 ```
 
@@ -54,10 +55,15 @@ Run a permission-free deterministic self-check after installation or inspect loc
 
 ```bash
 term-chameleon check --output-dir artifacts/check
+term-chameleon setup
+term-chameleon setup --yes
+term-chameleon setup --live
 term-chameleon status
 term-chameleon status --live
 term-chameleon status --json
 ```
+
+`setup` is a guided flow: it runs deterministic checks and reports status. On first run, bare `setup` exits nonzero until a healthy profile exists; use `setup --yes` to install the generated profile, and `setup --live` to include live iTerm2 API/window readiness.
 
 Install a balanced preset into a target directory:
 

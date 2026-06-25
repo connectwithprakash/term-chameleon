@@ -41,6 +41,7 @@ from .pixel_contrast import write_contrast_report
 from .presets import PRESETS
 from .screenshot import probe_screenshot
 from .screenshot_test import run_screenshot_test
+from .setup import run_setup
 from .status import collect_status, status_to_json
 from .terminal_pattern import write_pattern_bundle
 from .text_contrast import write_text_contrast_report
@@ -134,6 +135,17 @@ def main(argv: list[str] | None = None) -> int:
     status.add_argument("--profile", type=Path, help="Dynamic Profile JSON path to inspect")
     status.add_argument("--live", action="store_true", help="Probe live iTerm2 API/window bounds")
     status.add_argument("--json", action="store_true", help="Emit machine-readable status JSON")
+
+    setup = sub.add_parser(
+        "setup",
+        help="Run guided local setup checks and optionally install the default profile",
+    )
+    setup.add_argument("--output-dir", type=Path, default=Path("artifacts/setup"))
+    setup.add_argument("--profile", type=Path, help="Dynamic Profile JSON path to inspect/install")
+    setup.add_argument("--preset", choices=sorted(PRESETS), default="balanced")
+    setup.add_argument("--name", default="Adaptive Glass Alpha")
+    setup.add_argument("--yes", action="store_true", help="Install the generated profile if needed")
+    setup.add_argument("--live", action="store_true", help="Probe live iTerm2 API/window bounds")
 
     watch_sim = sub.add_parser("watch-sim", help="Simulate dynamic mode selection from samples")
     watch_sim.add_argument(
@@ -312,6 +324,15 @@ def main(argv: list[str] | None = None) -> int:
             return _check(output_dir=args.output_dir, width=args.width, height=args.height)
         if args.command == "status":
             return _status(profile=args.profile, live=args.live, json_output=args.json)
+        if args.command == "setup":
+            return _setup(
+                output_dir=args.output_dir,
+                profile=args.profile,
+                preset=args.preset,
+                name=args.name,
+                yes=args.yes,
+                live=args.live,
+            )
         if args.command == "watch-sim":
             return _watch_sim(args.samples, stable=args.stable)
         if args.command == "watch-live":
@@ -619,6 +640,42 @@ def _status(*, profile: Path | None, live: bool, json_output: bool) -> int:
     print(f"Ready for live: {'yes' if report.ready_for_live else 'no'}")
     print(f"Recommended next command: {report.recommended_next_command}")
     return 0 if report.ready_for_live or not live else 1
+
+
+def _setup(
+    *,
+    output_dir: Path,
+    profile: Path | None,
+    preset: str,
+    name: str,
+    yes: bool,
+    live: bool,
+) -> int:
+    report = run_setup(
+        output_dir=output_dir,
+        yes=yes,
+        live=live,
+        profile_path=profile,
+        preset=preset,
+        name=name,
+    )
+    print(f"Wrote: {output_dir / 'deterministic-check-report.json'}")
+    print(f"Wrote: {output_dir / 'deterministic-check-report.md'}")
+    for step in report.check_report.steps:
+        marker = "ok" if step.passed else "fail"
+        print(f"[{marker}] check/{step.name}: {step.detail}")
+    if report.installed_profile:
+        print(f"[ok] installed profile: {report.installed_profile_path}")
+    elif not any(check.name == "profile" and check.ok for check in report.status_after.checks):
+        print("[warn] profile not installed or not healthy; rerun with --yes to install")
+    print("")
+    for check in report.status_after.checks:
+        marker = "ok" if check.ok else "warn"
+        print(f"[{marker}] status/{check.name}: {check.detail}")
+    print("")
+    print(f"Ready for live: {'yes' if report.status_after.ready_for_live else 'no'}")
+    print(f"Recommended next command: {report.next_command}")
+    return 0 if report.passed else 1
 
 
 def _watch_sim(samples: list[str], *, stable: int) -> int:

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.0a3 - 2026-06-25
+
+### Added
+
+- `term-chameleon setup` guided setup flow.
+- Setup flow runs deterministic self-checks, summarizes readiness, and optionally installs the generated profile with `--yes`.
+- `setup --live` includes live iTerm2 API/window readiness in the final setup result.
+
 ## 0.1.0a2 - 2026-06-25
 
 ### Added
