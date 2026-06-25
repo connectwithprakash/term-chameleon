@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.0a5 - 2026-06-25
+
+### Added
+
+- `term-chameleon watch-daemon-status` to inspect the AutoLaunch script, log path, pid file, and running pid state.
+- `term-chameleon uninstall-watch-daemon` with dry-run and backup support.
+- Tests for watch daemon install/status/uninstall lifecycle behavior.
+
 ## 0.1.0a4 - 2026-06-25
 
 ### Added

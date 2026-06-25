@@ -6,7 +6,7 @@ Glassy terminal themes look good until white text disappears over a bright windo
 
 ## Current status
 
-This repository is prepared as `v0.1.0-alpha.4` / Python package version `0.1.0a4`: an end-to-end alpha for static profile diagnostics, safe profile mutation, deterministic visual artifacts, live iTerm2 adaptation, and controlled macOS GUI/screenshot QA. Implemented:
+This repository is prepared as `v0.1.0-alpha.5` / Python package version `0.1.0a5`: an end-to-end alpha for static profile diagnostics, safe profile mutation, deterministic visual artifacts, live iTerm2 adaptation, and controlled macOS GUI/screenshot QA. Implemented:
 
 - iTerm2 Dynamic Profile JSON parsing.
 - Color conversion between hex and iTerm2 color dictionaries.
@@ -30,6 +30,7 @@ This repository is prepared as `v0.1.0-alpha.4` / Python package version `0.1.0a
 - Local readiness status command with human and JSON output.
 - Guided setup command that runs deterministic checks and optionally installs the default profile.
 - TOML config example and `--config` support for setup/watch-live/watch daemon flows.
+- Watch daemon status and uninstall commands for AutoLaunch lifecycle management.
 - Fixture tests for good and bad iTerm2 profiles.
 
 Optional future refinements:
@@ -44,7 +45,7 @@ Build and install the alpha wheel locally:
 ```bash
 uv build
 python3 -m venv /tmp/term-chameleon-alpha-venv
-/tmp/term-chameleon-alpha-venv/bin/pip install dist/term_chameleon-0.1.0a4-py3-none-any.whl
+/tmp/term-chameleon-alpha-venv/bin/pip install dist/term_chameleon-0.1.0a5-py3-none-any.whl
 /tmp/term-chameleon-alpha-venv/bin/term-chameleon check --output-dir /tmp/term-chameleon-alpha-check
 ```
 
@@ -80,8 +81,14 @@ Install an iTerm2 AutoLaunch script that starts the live watcher whenever iTerm2
 
 ```bash
 term-chameleon install-watch-daemon --dry-run
+term-chameleon watch-daemon-status
 term-chameleon install-watch-daemon
+term-chameleon watch-daemon-status --json
+term-chameleon uninstall-watch-daemon --dry-run
+term-chameleon uninstall-watch-daemon
 ```
+
+`uninstall-watch-daemon` removes the iTerm2 AutoLaunch script only; it does not stop an already-running watcher process or remove logs/pid files. It creates a backup by default unless `--no-backup` is passed.
 
 Apply a manual readability mode to a profile JSON file:
 

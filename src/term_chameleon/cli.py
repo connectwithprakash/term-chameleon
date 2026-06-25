@@ -62,8 +62,10 @@ from .watch import ModeSelector, Sample
 from .watch_daemon import (
     DEFAULT_LOG_PATH,
     DEFAULT_PID_PATH,
+    get_watch_daemon_status,
     install_watch_autolaunch_script,
     shell_command,
+    uninstall_watch_autolaunch_script,
     watch_live_command,
 )
 from .watch_live import WatchLiveConfig, run_watch_live
@@ -116,6 +118,25 @@ def main(argv: list[str] | None = None) -> int:
     install_watch.add_argument("--log-path", type=Path, default=None)
     install_watch.add_argument("--pid-path", type=Path, default=None)
     install_watch.add_argument("--dry-run", action="store_true")
+
+    watch_daemon_status = sub.add_parser(
+        "watch-daemon-status",
+        help="Inspect the iTerm2 AutoLaunch watch daemon script, log, and pid",
+    )
+    watch_daemon_status.add_argument("--config", type=Path, help="TOML config file")
+    watch_daemon_status.add_argument("--autolaunch-dir", type=Path, default=None)
+    watch_daemon_status.add_argument("--log-path", type=Path, default=None)
+    watch_daemon_status.add_argument("--pid-path", type=Path, default=None)
+    watch_daemon_status.add_argument("--json", action="store_true")
+
+    uninstall_watch = sub.add_parser(
+        "uninstall-watch-daemon",
+        help="Remove the Term Chameleon iTerm2 AutoLaunch watch daemon script",
+    )
+    uninstall_watch.add_argument("--config", type=Path, help="TOML config file")
+    uninstall_watch.add_argument("--autolaunch-dir", type=Path, default=None)
+    uninstall_watch.add_argument("--dry-run", action="store_true")
+    uninstall_watch.add_argument("--no-backup", action="store_true")
 
     mode = sub.add_parser("mode", help="Apply a readability mode/preset to a profile JSON file")
     mode.add_argument("preset", choices=sorted(PRESETS))
@@ -331,6 +352,21 @@ def main(argv: list[str] | None = None) -> int:
                 log_path=args.log_path,
                 pid_path=args.pid_path,
                 dry_run=args.dry_run,
+                config=args.config,
+            )
+        if args.command == "watch-daemon-status":
+            return _watch_daemon_status(
+                autolaunch_dir=args.autolaunch_dir,
+                log_path=args.log_path,
+                pid_path=args.pid_path,
+                json_output=args.json,
+                config=args.config,
+            )
+        if args.command == "uninstall-watch-daemon":
+            return _uninstall_watch_daemon(
+                autolaunch_dir=args.autolaunch_dir,
+                dry_run=args.dry_run,
+                backup=not args.no_backup,
                 config=args.config,
             )
         if args.command == "mode":
@@ -613,6 +649,91 @@ def _install_watch_daemon(
     print(f"PID path: {result.pid_path.expanduser()}")
     print("[ok] watch AutoLaunch script compiles")
     return 0
+
+
+def _daemon_paths_from_config(
+    *,
+    config: Path | None,
+    autolaunch_dir: Path | None,
+    log_path: Path | None = None,
+    pid_path: Path | None = None,
+) -> tuple[Path, Path, Path]:
+    cfg = load_config(config)
+    daemon_cfg = merged_section(cfg, "daemon", fallback="watch")
+    resolved_autolaunch = autolaunch_dir or path_value(
+        value(daemon_cfg, "autolaunch_dir"), DEFAULT_AUTOLAUNCH_DIR
+    )
+    resolved_log = log_path or path_value(value(daemon_cfg, "log_path"), DEFAULT_LOG_PATH)
+    resolved_pid = pid_path or path_value(value(daemon_cfg, "pid_path"), DEFAULT_PID_PATH)
+    assert resolved_autolaunch is not None
+    assert resolved_log is not None
+    assert resolved_pid is not None
+    return (resolved_autolaunch, resolved_log, resolved_pid)
+
+
+def _watch_daemon_status(
+    *,
+    autolaunch_dir: Path | None,
+    log_path: Path | None,
+    pid_path: Path | None,
+    json_output: bool,
+    config: Path | None,
+) -> int:
+    resolved_autolaunch, resolved_log, resolved_pid = _daemon_paths_from_config(
+        config=config,
+        autolaunch_dir=autolaunch_dir,
+        log_path=log_path,
+        pid_path=pid_path,
+    )
+    status = get_watch_daemon_status(
+        target_dir=resolved_autolaunch,
+        log_path=resolved_log,
+        pid_path=resolved_pid,
+    )
+    if json_output:
+        print(json.dumps(asdict(status), indent=2, default=str))
+    else:
+        print(f"AutoLaunch script: {status.target}")
+        print(f"Installed: {'yes' if status.installed else 'no'}")
+        print(f"Executable: {'yes' if status.executable else 'no'}")
+        print(f"Log path: {status.log_path} ({'exists' if status.log_exists else 'missing'})")
+        print(f"PID path: {status.pid_path}")
+        if status.pid is None:
+            print("PID: none")
+        else:
+            print(f"PID: {status.pid} ({'running' if status.running else 'not running'})")
+        if status.healthy:
+            print("[ok] watch daemon AutoLaunch script is installed")
+        else:
+            print("[warn] watch daemon AutoLaunch script is not installed and executable")
+    return 0 if status.healthy else 1
+
+
+def _uninstall_watch_daemon(
+    *,
+    autolaunch_dir: Path | None,
+    dry_run: bool,
+    backup: bool,
+    config: Path | None,
+) -> int:
+    resolved_autolaunch, _resolved_log, _resolved_pid = _daemon_paths_from_config(
+        config=config,
+        autolaunch_dir=autolaunch_dir,
+    )
+    result = uninstall_watch_autolaunch_script(
+        target_dir=resolved_autolaunch,
+        dry_run=dry_run,
+        backup=backup,
+    )
+    if result.removed:
+        action = "Would remove" if dry_run else "Removed"
+        print(f"{action}: {result.target}")
+        if result.backup_path is not None:
+            print(f"Backup: {result.backup_path}")
+        print("[ok] watch daemon AutoLaunch script removed")
+        return 0
+    print(f"Not installed: {result.target}")
+    return 1
 
 
 def _mode(path: Path, preset: str, *, dry_run: bool, yes: bool) -> int:

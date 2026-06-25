@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import shlex
 import sys
 from dataclasses import dataclass
@@ -22,6 +23,46 @@ class WatchDaemonInstall:
     command: tuple[str, ...]
     log_path: Path
     pid_path: Path
+
+
+@dataclass(frozen=True)
+class WatchDaemonStatus:
+    target: Path
+    installed: bool
+    executable: bool
+    log_path: Path
+    log_exists: bool
+    pid_path: Path
+    pid: int | None
+    running: bool
+
+    @property
+    def healthy(self) -> bool:
+        return self.installed and self.executable
+
+
+@dataclass(frozen=True)
+class WatchDaemonUninstall:
+    target: Path
+    removed: bool
+    backup_path: Path | None
+
+
+def pid_is_running(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def read_pid(path: Path) -> int | None:
+    try:
+        return int(path.expanduser().read_text(encoding="utf-8").strip())
+    except (FileNotFoundError, ValueError):
+        return None
 
 
 def watch_live_command(
@@ -133,9 +174,9 @@ def install_watch_autolaunch_script(
     dry_run: bool = False,
 ) -> WatchDaemonInstall:
     content = watch_autolaunch_script(command=command, log_path=log_path, pid_path=pid_path)
-    target = target_dir / WATCH_AUTOLAUNCH_FILENAME
+    target = target_dir.expanduser() / WATCH_AUTOLAUNCH_FILENAME
     if not dry_run:
-        target_dir.mkdir(parents=True, exist_ok=True)
+        target.parent.mkdir(parents=True, exist_ok=True)
         if target.exists():
             backup_file(target)
         atomic_write_text(target, content)
@@ -144,9 +185,47 @@ def install_watch_autolaunch_script(
         target=target,
         content=content,
         command=command,
-        log_path=log_path,
-        pid_path=pid_path,
+        log_path=log_path.expanduser(),
+        pid_path=pid_path.expanduser(),
     )
+
+
+def get_watch_daemon_status(
+    *,
+    target_dir: Path = DEFAULT_AUTOLAUNCH_DIR,
+    log_path: Path = DEFAULT_LOG_PATH,
+    pid_path: Path = DEFAULT_PID_PATH,
+) -> WatchDaemonStatus:
+    target = target_dir.expanduser() / WATCH_AUTOLAUNCH_FILENAME
+    resolved_log_path = log_path.expanduser()
+    resolved_pid_path = pid_path.expanduser()
+    pid = read_pid(resolved_pid_path)
+    return WatchDaemonStatus(
+        target=target,
+        installed=target.exists(),
+        executable=target.exists() and os.access(target, os.X_OK),
+        log_path=resolved_log_path,
+        log_exists=resolved_log_path.exists(),
+        pid_path=resolved_pid_path,
+        pid=pid,
+        running=pid_is_running(pid) if pid is not None else False,
+    )
+
+
+def uninstall_watch_autolaunch_script(
+    *,
+    target_dir: Path = DEFAULT_AUTOLAUNCH_DIR,
+    dry_run: bool = False,
+    backup: bool = True,
+) -> WatchDaemonUninstall:
+    target = target_dir.expanduser() / WATCH_AUTOLAUNCH_FILENAME
+    backup_path: Path | None = None
+    removed = target.exists()
+    if removed and not dry_run:
+        if backup:
+            backup_path = backup_file(target)
+        target.unlink()
+    return WatchDaemonUninstall(target=target, removed=removed, backup_path=backup_path)
 
 
 def shell_command(command: tuple[str, ...]) -> str:
