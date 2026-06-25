@@ -2,11 +2,11 @@
 
 Term Chameleon is an adaptive contrast/readability toolkit for translucent terminals, starting with iTerm2 on macOS.
 
-Glassy terminal themes look good until white text disappears over a bright window, black/dim text vanishes over dark blur, or iTerm2 Light/Dark profile variants silently override the intended palette. Term Chameleon starts with a static iTerm2 Dynamic Profile doctor/fixer and is designed to grow into a live background-aware contrast daemon.
+Glassy terminal themes look good until white text disappears over a bright window, black/dim text vanishes over dark blur, or iTerm2 Light/Dark profile variants silently override the intended palette. Term Chameleon provides static profile diagnostics/fixes plus live background-aware sampling, staging, and adaptation for iTerm2.
 
 ## Current status
 
-This repository is in MVP scaffolding. Implemented now:
+This repository now has an end-to-end MVP for static profile diagnostics, safe profile mutation, deterministic visual artifacts, live iTerm2 adaptation, and controlled macOS GUI/screenshot QA. Implemented:
 
 - iTerm2 Dynamic Profile JSON parsing.
 - Color conversion between hex and iTerm2 color dictionaries.
@@ -28,9 +28,10 @@ This repository is in MVP scaffolding. Implemented now:
 - Long-running daemon packaging for continuous adaptation.
 - Fixture tests for good and bad iTerm2 profiles.
 
-Planned later:
+Optional future refinements:
 
-- Full window orchestration: automatically arrange controlled browser background + iTerm2 pattern window and measure actual text pixels.
+- Replace heuristic text-row detection with OCR/terminal-cell-aware glyph segmentation.
+- Add broader terminal emulator support beyond iTerm2.
 
 ## CLI examples
 
@@ -106,7 +107,10 @@ Doctor a profile:
 
 ```bash
 term-chameleon doctor tests/fixtures/iterm/bad-light-variant.json
+term-chameleon doctor tests/fixtures/iterm/bad-light-variant.json --json
 ```
+
+`doctor --json` emits machine-readable diagnostics after a profile loads successfully; profile load/parse errors still use the standard nonzero exit code with an error on stderr.
 
 Preview fixes:
 

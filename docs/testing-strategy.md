@@ -9,8 +9,8 @@ Term Chameleon should be verifiable without manual supervision for objective cor
 1. Unit tests for colors, contrast, profile parsing, diagnostics, fixes, and mode selection.
 2. CLI tests with fixture profiles.
 3. Integration tests for iTerm2 Dynamic Profile file installation and AutoLaunch script compilation.
-4. Visual tests in two layers: deterministic profile simulation first, screenshot/pixel tests later.
-5. Dynamic watcher E2E tests with controlled background changes and hysteresis assertions.
+4. Visual tests in deterministic simulation, screenshot/pixel analysis, text-row contrast analysis, and live GUI staging layers.
+5. Dynamic watcher E2E tests with controlled samples, iTerm-window sampling, and hysteresis assertions.
 
 ## Visual test design
 
@@ -27,15 +27,25 @@ The current harness is a deterministic pre-screenshot simulation. It:
 3. Computes WCAG contrast for normal, bold, ANSI black, bright black, white, and bright white.
 4. Emits JSON and Markdown reports.
 
-Planned screenshot harness:
+Screenshot/live harness commands:
 
-1. Create controlled backgrounds: dark, light, gray, checkerboard, gradient.
-2. Open iTerm2 with target profile.
-3. Render the ANSI test pattern.
-4. Capture screenshots.
-5. Locate known text rows or markers.
-6. Measure foreground/background contrast with WCAG and later APCA.
-7. Emit PNG artifacts and a pass/fail report.
+```bash
+term-chameleon screenshot-test --capture --output-dir artifacts/screenshot-test
+term-chameleon screenshot-contrast artifacts/screenshot-probe/screen.png
+term-chameleon screenshot-text-contrast artifacts/screenshot-probe/screen.png
+term-chameleon live-stage --yes --capture --output-dir artifacts/live-stage
+```
+
+The first three commands are deterministic or permission-light. `live-stage --yes --capture` is a live smoke gate: it can run unattended after macOS Screen Recording/Automation permissions are granted, but it intentionally activates/moves Safari and iTerm2 windows.
+
+The screenshot/live harness:
+
+1. Creates controlled backgrounds: dark, light, gray, checkerboard, gradient.
+2. Renders an ANSI test pattern.
+3. Captures screenshots when macOS permissions allow.
+4. Locates the iTerm2 window region.
+5. Measures text-row contrast with pixel-cluster fallback.
+6. Emits PNG artifacts plus JSON/Markdown pass/fail reports.
 
 Text styles to test:
 
@@ -57,15 +67,21 @@ Artifacts:
 artifacts/visual-test/report.json
 artifacts/visual-test/report.md
 artifacts/visual-test/ansi-pattern.txt
-artifacts/visual-test/*.png  # planned screenshot harness
+artifacts/screenshot-test/*
+artifacts/screenshot-contrast/contrast-report.json
+artifacts/screenshot-text-contrast/text-contrast-report.json
+artifacts/live-stage/live-stage-report.json
+artifacts/live-stage/live-stage-screen.png
 ```
 
 ## Dynamic E2E design
 
-Planned command:
+Implemented commands:
 
 ```bash
-term-chameleon e2e-test --watch
+term-chameleon watch-sim --stable 2 0.2 0.2 0.8 0.8 0.5:0.12 0.5:0.12
+term-chameleon watch-live --dry-run --iterm-window --duration 10 --interval 1 --stable 2
+scripts/live-iterm-smoke.sh
 ```
 
 Flow:

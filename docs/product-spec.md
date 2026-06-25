@@ -2,7 +2,7 @@
 
 ## Summary
 
-Term Chameleon is a contrast-management tool for translucent/glassy terminal environments. It helps users keep transparent or blurred terminals readable by diagnosing, fixing, and eventually dynamically adapting profile colors, contrast settings, transparency, and blur.
+Term Chameleon is a contrast-management tool for translucent/glassy terminal environments. It helps users keep transparent or blurred terminals readable by diagnosing, fixing, staging, measuring, and dynamically adapting profile colors, contrast settings, transparency, and blur.
 
 Initial platform: iTerm2 on macOS.
 
@@ -12,9 +12,9 @@ Initial platform: iTerm2 on macOS.
 2. Preserve aesthetics when possible.
 3. Explain contrast problems clearly.
 4. Make profile changes safe and reversible.
-5. Evolve from static doctor/fixer to dynamic adaptation.
+5. Provide objective deterministic and live screenshot QA evidence for readability changes.
 
-## Non-goals for MVP
+## Non-goals
 
 - Renderer-level per-glyph inversion.
 - Forking terminal emulators.
@@ -43,10 +43,9 @@ Shows an explainable diff, creates timestamped backups before writing, and appli
 
 ### Install / preset flow
 
-Planned:
-
 ```bash
 term-chameleon install --preset balanced --name "Adaptive Glass"
+term-chameleon install-watch-daemon --dry-run
 ```
 
 Installs iTerm2 Dynamic Profile JSON under:
@@ -54,6 +53,8 @@ Installs iTerm2 Dynamic Profile JSON under:
 ```text
 ~/Library/Application Support/iTerm2/DynamicProfiles/
 ```
+
+`install-watch-daemon` installs an iTerm2 AutoLaunch script under the user's AutoLaunch scripts directory so `watch-live --yes --iterm-window` can start when iTerm2 launches.
 
 ### Visual test harness
 
@@ -63,17 +64,27 @@ Runs the current deterministic pre-screenshot visual simulation:
 term-chameleon visual-test <profile.json>
 ```
 
-It models controlled solid backgrounds, writes an ANSI pattern artifact, and computes WCAG contrast metrics. A later screenshot harness will create controlled windows, open iTerm2, capture screenshots, and measure text pixels.
+It models controlled solid backgrounds, writes ANSI pattern artifacts, computes WCAG contrast metrics, and is complemented by screenshot/pixel QA commands:
+
+```bash
+term-chameleon screenshot-contrast <image>
+term-chameleon screenshot-text-contrast <image>
+term-chameleon live-stage --yes --capture
+```
+
+The live stage arranges a controlled Safari background and iTerm2 pattern window, captures the screen, scopes analysis to the iTerm2 window, and reports text-row contrast with pixel-cluster fallback.
 
 ### Dynamic watcher
 
-Foundation command for deterministic mode-selection simulation:
+Dynamic mode-selection simulation and live iTerm2 session adaptation:
 
 ```bash
 term-chameleon watch-sim 0.2 0.8 0.8 0.8 0.5:0.12
+term-chameleon sample --screen --iterm-window
+term-chameleon watch-live --yes --iterm-window
 ```
 
-This exercises the risk classifier and hysteresis mode selector. A live watcher is planned next and will start with heuristics before screen sampling.
+This exercises the risk classifier and hysteresis mode selector in simulation, then uses live iTerm2 session-local profile mutation for screen/window-aware adaptation.
 
 ## Adaptation modes
 

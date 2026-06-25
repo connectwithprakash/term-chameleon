@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from dataclasses import asdict
 from pathlib import Path
 
 from .adapt import (
@@ -59,6 +60,7 @@ def main(argv: list[str] | None = None) -> int:
 
     doctor = sub.add_parser("doctor", help="Diagnose an iTerm2 Dynamic Profile JSON file")
     doctor.add_argument("profile", type=Path)
+    doctor.add_argument("--json", action="store_true", help="Emit machine-readable diagnostics")
 
     fix = sub.add_parser("fix", help="Apply conservative readability fixes to an iTerm2 profile")
     fix.add_argument("profile", type=Path)
@@ -255,7 +257,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         if args.command == "doctor":
-            return _doctor(args.profile)
+            return _doctor(args.profile, json_output=args.json)
         if args.command == "fix":
             return _fix(args.profile, dry_run=args.dry_run, yes=args.yes)
         if args.command == "install":
@@ -387,20 +389,45 @@ def main(argv: list[str] | None = None) -> int:
     return 2
 
 
-def _doctor(path: Path) -> int:
+def _doctor(path: Path, *, json_output: bool = False) -> int:
     profile = load_profile(path)
     diagnostics = diagnose(profile)
-    print(f"Profile: {profile.name}")
     bg = profile.background
     fg = profile.foreground
+    foreground_contrast = None
+    if bg and fg:
+        from .contrast import contrast_ratio
+
+        foreground_contrast = contrast_ratio(fg, bg)
+    exit_code = 1 if any(d.severity == "fail" for d in diagnostics) else 0
+    if json_output:
+        payload = {
+            "profile": profile.name,
+            "path": str(path),
+            "background": bg.to_hex() if bg else None,
+            "foreground": fg.to_hex() if fg else None,
+            "foreground_contrast": foreground_contrast,
+            "diagnostics": [asdict(d) for d in diagnostics],
+            "summary": {
+                "ok": len([d for d in diagnostics if d.severity == "ok"]),
+                "info": len([d for d in diagnostics if d.severity == "info"]),
+                "warn": len([d for d in diagnostics if d.severity == "warn"]),
+                "fail": len([d for d in diagnostics if d.severity == "fail"]),
+            },
+            "passed": exit_code == 0,
+        }
+        print(json.dumps(payload, indent=2) + "\n", end="")
+        return exit_code
+
+    print(f"Profile: {profile.name}")
     if bg:
         print(f"Background: {bg.to_hex()}")
     if fg:
         print(f"Foreground: {fg.to_hex()}")
-    if bg and fg:
-        from .contrast import contrast_ratio, format_ratio
+    if foreground_contrast is not None:
+        from .contrast import format_ratio
 
-        print(f"Foreground contrast: {format_ratio(contrast_ratio(fg, bg))}")
+        print(f"Foreground contrast: {format_ratio(foreground_contrast)}")
     print()
     if not diagnostics:
         print("[ok] no contrast/profile issues detected")
@@ -410,7 +437,7 @@ def _doctor(path: Path) -> int:
         print(f"  {d.detail}")
         if d.suggestion:
             print(f"  Suggestion: {d.suggestion}")
-    return 1 if any(d.severity == "fail" for d in diagnostics) else 0
+    return exit_code
 
 
 def _fix(path: Path, *, dry_run: bool, yes: bool) -> int:
