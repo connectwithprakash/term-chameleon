@@ -84,8 +84,9 @@ Implemented:
 - deterministic CLI simulation: `term-chameleon watch-sim`.
 - image/screen sampling: `term-chameleon sample --image/--screen`.
 - safe one-shot adaptation: `term-chameleon adapt-once <profile.json> --image/--screen --dry-run|--yes`.
+- live adaptive iTerm2 watcher: `term-chameleon watch-live --dry-run|--yes`, with interval, duration, stable-sample, cooldown, and initial-mode controls.
 
-`watch-sim` is not a live daemon; it is the deterministic testable core. `adapt-once` is the first working screen-sampling adaptation path.
+`watch-sim` is the deterministic testable core. `adapt-once` is a single adaptation pass. `watch-live` is the working continuous live loop for the current iTerm2 session.
 
 ## Milestone 6: live iTerm2/screenshot spike
 

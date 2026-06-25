@@ -19,6 +19,7 @@ This repository is in MVP scaffolding. Implemented now:
 - Dynamic watcher foundation via `watch-sim` risk classifier and hysteresis mode selector.
 - iTerm2 live-adapter script generation/probe foundation for session-local Python API validation.
 - Screen/image sampling one-shot adaptation via `sample` and `adapt-once`.
+- Live adaptive watcher via `watch-live`, with dry-run, stable-sample, cooldown, duration, and real iTerm2 session-local apply modes.
 - Deterministic E2E staging bundle that combines controlled backgrounds, ANSI pattern artifacts, visual simulation, screenshot capture, and screenshot pixel analysis.
 - macOS `screencapture` probe and screenshot-test artifact foundation for screenshot-based visual tests.
 - Fixture tests for good and bad iTerm2 profiles.
@@ -69,6 +70,14 @@ term-chameleon pattern-script --output-dir artifacts/pattern-script
 term-chameleon e2e-stage tests/fixtures/iterm/good-dark-glass.json --output-dir artifacts/e2e-stage
 term-chameleon sample --screen --output artifacts/adapt/screen.png
 term-chameleon adapt-once tests/fixtures/iterm/good-dark-glass.json --screen --dry-run
+term-chameleon watch-live --dry-run --duration 10 --interval 1 --stable 2
+term-chameleon watch-live --yes --duration 30 --interval 2 --stable 3 --cooldown 10
+```
+
+Manual live smoke test, once iTerm2 is running and the Python API is enabled:
+
+```bash
+scripts/live-iterm-smoke.sh
 ```
 
 Run deterministic visual simulation:

@@ -37,6 +37,7 @@ from .screenshot_test import run_screenshot_test
 from .terminal_pattern import write_pattern_bundle
 from .visual import write_visual_report
 from .watch import ModeSelector, Sample
+from .watch_live import WatchLiveConfig, run_watch_live
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -82,6 +83,20 @@ def main(argv: list[str] | None = None) -> int:
         help="Samples as luminance or luminance:variance, e.g. 0.2 0.8 0.5:0.12",
     )
     watch_sim.add_argument("--stable", type=int, default=3)
+
+    watch_live = sub.add_parser(
+        "watch-live", help="Continuously sample the screen and adapt current iTerm2 session"
+    )
+    watch_live.add_argument("--interval", type=float, default=2.0)
+    watch_live.add_argument("--duration", type=float, default=60.0)
+    watch_live.add_argument("--stable", type=int, default=3)
+    watch_live.add_argument("--cooldown", type=float, default=10.0)
+    watch_live.add_argument("--output-dir", type=Path, default=Path("artifacts/watch-live"))
+    watch_live.add_argument("--initial-mode", choices=sorted(PRESETS), default="balanced")
+    watch_live.add_argument("--dry-run", action="store_true")
+    watch_live.add_argument(
+        "--yes", action="store_true", help="Actually mutate the current iTerm2 session"
+    )
 
     sub.add_parser("iterm-api-check", help="Check local iTerm2 Python API readiness")
     sub.add_parser("iterm-connect-probe", help="Attempt to connect to the live iTerm2 Python API")
@@ -163,6 +178,17 @@ def main(argv: list[str] | None = None) -> int:
             return _visual_test(args.profile, args.output_dir)
         if args.command == "watch-sim":
             return _watch_sim(args.samples, stable=args.stable)
+        if args.command == "watch-live":
+            return _watch_live(
+                interval=args.interval,
+                duration=args.duration,
+                stable=args.stable,
+                cooldown=args.cooldown,
+                output_dir=args.output_dir,
+                initial_mode=args.initial_mode,
+                dry_run=args.dry_run,
+                yes=args.yes,
+            )
         if args.command == "iterm-api-check":
             return _iterm_api_check()
         if args.command == "iterm-connect-probe":
@@ -327,6 +353,43 @@ def _watch_sim(samples: list[str], *, stable: int) -> int:
             f"{index}: luminance={sample.luminance:.2f} variance={sample.variance:.2f} "
             f"risk={classification.risk} mode={mode} {marker} reason={classification.reason}"
         )
+    return 0
+
+
+def _watch_live(
+    *,
+    interval: float,
+    duration: float,
+    stable: int,
+    cooldown: float,
+    output_dir: Path,
+    initial_mode: str,
+    dry_run: bool,
+    yes: bool,
+) -> int:
+    if not dry_run and not yes:
+        print("Refusing to mutate iTerm2 without --yes. Use --dry-run to preview.", file=sys.stderr)
+        return 2
+    config = WatchLiveConfig(
+        interval=interval,
+        duration=duration,
+        stable=stable,
+        cooldown=cooldown,
+        output_dir=output_dir,
+        dry_run=dry_run,
+        initial_mode=initial_mode,
+    )
+    events = run_watch_live(config)
+    for event in events:
+        marker = "switch" if event.switched else "hold"
+        apply_marker = " applied" if event.applied else ""
+        print(
+            f"{event.index}: t={event.elapsed:.1f}s lum={event.luminance:.3f} "
+            f"var={event.variance:.3f} risk={event.risk} "
+            f"candidate={event.candidate_mode} mode={event.mode} {marker}{apply_marker} "
+            f"reason={event.reason} message={event.message}"
+        )
+    print(f"[ok] watch-live completed {len(events)} sample(s)")
     return 0
 
 
