@@ -23,7 +23,7 @@ This repository is in MVP scaffolding. Implemented now:
 - Deterministic E2E staging bundle that combines controlled backgrounds, ANSI pattern artifacts, visual simulation, screenshot capture, and screenshot pixel analysis.
 - Screenshot contrast estimation for captured PNG/PPM artifacts.
 - Text-row/glyph-aware screenshot contrast estimation for rendered terminal pattern captures.
-- Live GUI staging that arranges controlled Safari background + iTerm2 ANSI pattern windows and can optionally capture/analyze the result.
+- Live GUI staging that arranges controlled Safari background + iTerm2 ANSI pattern windows and can optionally capture/analyze the result with text-row contrast and pixel-cluster fallback.
 - macOS `screencapture` probe and screenshot-test artifact foundation for screenshot-based visual tests.
 - Long-running daemon packaging for continuous adaptation.
 - Fixture tests for good and bad iTerm2 profiles.

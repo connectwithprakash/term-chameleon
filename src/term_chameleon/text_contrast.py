@@ -11,6 +11,10 @@ from .images import RasterImage, Region, crop_image
 from .screenshot_test import read_image_file
 
 
+class TextContrastUnavailable(ValueError):
+    """Raised when text-row contrast cannot be inferred from an image."""
+
+
 @dataclass(frozen=True)
 class TextRowBand:
     y: int
@@ -126,7 +130,7 @@ def estimate_raster_text_contrast(
         raise ValueError("glyph_delta must be positive")
     bands = detect_text_row_bands(image, min_row_delta=min_row_delta)
     if not bands:
-        raise ValueError(
+        raise TextContrastUnavailable(
             "no text-like rows found; lower --min-row-delta or provide a tighter --region"
         )
 
@@ -149,11 +153,13 @@ def estimate_raster_text_contrast(
         bands_with_counts.append(TextRowBand(band.y, band.height, band.score, glyph_count))
 
     if not glyph_pixels:
-        raise ValueError("text-like rows were found, but no glyph pixels passed glyph_delta")
+        raise TextContrastUnavailable(
+            "text-like rows were found, but no glyph pixels passed glyph_delta"
+        )
     if not background_pixels:
         background_pixels = [pixel for pixel in image.pixels if pixel not in glyph_pixels]
     if not background_pixels:
-        raise ValueError("could not identify background pixels")
+        raise TextContrastUnavailable("could not identify background pixels")
 
     foreground = _mean_color(glyph_pixels)
     background = _mean_color(background_pixels)

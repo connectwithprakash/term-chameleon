@@ -15,6 +15,7 @@ from .iterm_window import get_iterm_window_bounds
 from .pixel_contrast import write_contrast_report
 from .screenshot import capture_screen
 from .terminal_pattern import write_pattern_bundle
+from .text_contrast import TextContrastUnavailable, write_text_contrast_report
 
 DEFAULT_BROWSER_BOUNDS = "0,0,1470,956"
 DEFAULT_ITERM_BOUNDS = "80,90,980,760"
@@ -39,6 +40,12 @@ class LiveStageReport:
     suggested_mode: str | None
     estimated_contrast: float | None
     contrast_passed: bool | None
+    contrast_method: str | None
+    text_estimated_contrast: float | None
+    text_contrast_passed: bool | None
+    text_contrast_error: str | None
+    pixel_estimated_contrast: float | None
+    pixel_contrast_passed: bool | None
     settle_delay: float
 
 
@@ -139,6 +146,12 @@ def run_live_stage(
     suggested_mode: str | None = None
     estimated_contrast: float | None = None
     contrast_passed: bool | None = None
+    contrast_method: str | None = None
+    text_estimated_contrast: float | None = None
+    text_contrast_passed: bool | None = None
+    text_contrast_error: str | None = None
+    pixel_estimated_contrast: float | None = None
+    pixel_contrast_passed: bool | None = None
     if capture:
         screenshot_path = out / "live-stage-screen.png"
         screenshot = capture_screen(screenshot_path)
@@ -149,14 +162,31 @@ def run_live_stage(
                 iterm_region = bounds_result.region
             decision = decide_from_screen(screenshot_path, region=iterm_region)
             suggested_mode = decision.suggested_mode
-            _json_path, _md_path, estimate = write_contrast_report(
+            _json_path, _md_path, pixel_estimate = write_contrast_report(
                 screenshot_path,
                 out / "contrast",
                 region=iterm_region,
                 threshold=threshold,
             )
-            estimated_contrast = estimate.contrast
-            contrast_passed = estimate.passed
+            pixel_estimated_contrast = pixel_estimate.contrast
+            pixel_contrast_passed = pixel_estimate.passed
+            try:
+                _text_json, _text_md, text_estimate = write_text_contrast_report(
+                    screenshot_path,
+                    out / "text-contrast",
+                    region=iterm_region,
+                    threshold=threshold,
+                )
+                text_estimated_contrast = text_estimate.contrast
+                text_contrast_passed = text_estimate.passed
+                estimated_contrast = text_estimate.contrast
+                contrast_passed = text_estimate.passed
+                contrast_method = "text-row"
+            except TextContrastUnavailable as exc:
+                text_contrast_error = str(exc)
+                estimated_contrast = pixel_estimate.contrast
+                contrast_passed = pixel_estimate.passed
+                contrast_method = "pixel-cluster"
 
     report = LiveStageReport(
         output_dir=out,
@@ -176,6 +206,12 @@ def run_live_stage(
         suggested_mode=suggested_mode,
         estimated_contrast=estimated_contrast,
         contrast_passed=contrast_passed,
+        contrast_method=contrast_method,
+        text_estimated_contrast=text_estimated_contrast,
+        text_contrast_passed=text_contrast_passed,
+        text_contrast_error=text_contrast_error,
+        pixel_estimated_contrast=pixel_estimated_contrast,
+        pixel_contrast_passed=pixel_contrast_passed,
         settle_delay=settle_delay,
     )
     write_live_stage_report(report)
@@ -204,6 +240,12 @@ def write_live_stage_report(report: LiveStageReport) -> tuple[Path, Path]:
         f"- suggested mode: `{report.suggested_mode}`",
         f"- estimated contrast: `{report.estimated_contrast}`",
         f"- contrast passed: `{report.contrast_passed}`",
+        f"- contrast method: `{report.contrast_method}`",
+        f"- text-row contrast: `{report.text_estimated_contrast}`",
+        f"- text-row contrast passed: `{report.text_contrast_passed}`",
+        f"- text-row contrast error: `{report.text_contrast_error}`",
+        f"- pixel-cluster contrast: `{report.pixel_estimated_contrast}`",
+        f"- pixel-cluster contrast passed: `{report.pixel_contrast_passed}`",
         f"- settle delay: `{report.settle_delay}`",
         "",
         "## Browser AppleScript",

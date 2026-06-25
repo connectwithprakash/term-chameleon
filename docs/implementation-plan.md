@@ -71,7 +71,7 @@ Implemented:
 - Text-row/glyph-aware contrast estimator: detects high-delta text-like rows and estimates glyph/background contrast.
 - Controlled HTML backgrounds for browser/window staging.
 - Terminal ANSI pattern script artifacts.
-- Live GUI staging: `term-chameleon live-stage` arranges Safari controlled-background and iTerm2 ANSI-pattern windows, then optionally captures/analyzes screenshot region contrast.
+- Live GUI staging: `term-chameleon live-stage` arranges Safari controlled-background and iTerm2 ANSI-pattern windows, then optionally captures/analyzes screenshot region contrast using text-row contrast when detectable and pixel-cluster fallback otherwise.
 
 Remaining live visual work:
 

@@ -1,12 +1,55 @@
 import json
 import subprocess
+from pathlib import Path
+from types import SimpleNamespace
 
 from term_chameleon.cli import main
+from term_chameleon.images import Region
+from term_chameleon.iterm_window import WindowBoundsResult
 from term_chameleon.live_stage import (
     browser_stage_script,
     iterm_stage_script,
     run_live_stage,
 )
+from term_chameleon.pixel_contrast import ContrastEstimate
+from term_chameleon.screenshot import ScreenshotResult
+from term_chameleon.text_contrast import (
+    TextContrastEstimate,
+    TextContrastUnavailable,
+    TextRowBand,
+)
+
+
+def pixel_estimate(contrast: float = 3.0, passed: bool = False) -> ContrastEstimate:
+    return ContrastEstimate(
+        image_path="screen.png",
+        region="0,0,10,10",
+        dark_color="#000000",
+        light_color="#FFFFFF",
+        dark_luminance=0.0,
+        light_luminance=1.0,
+        contrast=contrast,
+        threshold=4.5,
+        passed=passed,
+        sampled_pixels=100,
+    )
+
+
+def text_estimate(contrast: float = 7.0, passed: bool = True) -> TextContrastEstimate:
+    return TextContrastEstimate(
+        image_path="screen.png",
+        region="0,0,10,10",
+        bands=[TextRowBand(2, 2, 1.0, 8)],
+        foreground_color="#FFFFFF",
+        background_color="#000000",
+        foreground_luminance=1.0,
+        background_luminance=0.0,
+        contrast=contrast,
+        threshold=4.5,
+        passed=passed,
+        glyph_pixels=8,
+        background_pixels=92,
+    )
 
 
 def test_browser_stage_script_contains_file_url(tmp_path):
@@ -55,6 +98,85 @@ def test_run_live_stage_executes_when_not_dry_run(monkeypatch, tmp_path):
     assert report.iterm_returncode == 0
     assert len(calls) == 2
     assert sleeps == []
+
+
+def test_run_live_stage_prefers_text_row_contrast(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        "term_chameleon.live_stage.run_osascript",
+        lambda _script: subprocess.CompletedProcess(["osascript"], 0, "", ""),
+    )
+    monkeypatch.setattr("term_chameleon.live_stage.time.sleep", lambda _delay: None)
+    monkeypatch.setattr(
+        "term_chameleon.live_stage.capture_screen",
+        lambda path: ScreenshotResult(True, True, Path(path), "captured", 0),
+    )
+    monkeypatch.setattr(
+        "term_chameleon.live_stage.get_iterm_window_bounds",
+        lambda: WindowBoundsResult(True, Region(0, 0, 10, 10), "ok"),
+    )
+    monkeypatch.setattr(
+        "term_chameleon.live_stage.decide_from_screen",
+        lambda *_args, **_kwargs: SimpleNamespace(suggested_mode="dark-glass"),
+    )
+    monkeypatch.setattr(
+        "term_chameleon.live_stage.write_contrast_report",
+        lambda *_args, **_kwargs: (
+            tmp_path / "pixel.json",
+            tmp_path / "pixel.md",
+            pixel_estimate(),
+        ),
+    )
+    monkeypatch.setattr(
+        "term_chameleon.live_stage.write_text_contrast_report",
+        lambda *_args, **_kwargs: (tmp_path / "text.json", tmp_path / "text.md", text_estimate()),
+    )
+
+    report = run_live_stage(tmp_path, dry_run=False, capture=True, settle_delay=0)
+
+    assert report.contrast_method == "text-row"
+    assert report.estimated_contrast == 7.0
+    assert report.contrast_passed is True
+    assert report.pixel_estimated_contrast == 3.0
+    assert report.text_estimated_contrast == 7.0
+
+
+def test_run_live_stage_falls_back_to_pixel_contrast(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        "term_chameleon.live_stage.run_osascript",
+        lambda _script: subprocess.CompletedProcess(["osascript"], 0, "", ""),
+    )
+    monkeypatch.setattr(
+        "term_chameleon.live_stage.capture_screen",
+        lambda path: ScreenshotResult(True, True, Path(path), "captured", 0),
+    )
+    monkeypatch.setattr(
+        "term_chameleon.live_stage.get_iterm_window_bounds",
+        lambda: WindowBoundsResult(True, Region(0, 0, 10, 10), "ok"),
+    )
+    monkeypatch.setattr(
+        "term_chameleon.live_stage.decide_from_screen",
+        lambda *_args, **_kwargs: SimpleNamespace(suggested_mode="dark-glass"),
+    )
+    monkeypatch.setattr(
+        "term_chameleon.live_stage.write_contrast_report",
+        lambda *_args, **_kwargs: (
+            tmp_path / "pixel.json",
+            tmp_path / "pixel.md",
+            pixel_estimate(5.0, True),
+        ),
+    )
+
+    def fail_text(*_args, **_kwargs):
+        raise TextContrastUnavailable("no text-like rows found")
+
+    monkeypatch.setattr("term_chameleon.live_stage.write_text_contrast_report", fail_text)
+
+    report = run_live_stage(tmp_path, dry_run=False, capture=True, settle_delay=0)
+
+    assert report.contrast_method == "pixel-cluster"
+    assert report.estimated_contrast == 5.0
+    assert report.contrast_passed is True
+    assert report.text_contrast_error == "no text-like rows found"
 
 
 def test_live_stage_cli_refuses_without_yes(tmp_path, capsys):

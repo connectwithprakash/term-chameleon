@@ -813,7 +813,8 @@ def _live_stage(
     if report.suggested_mode:
         print(f"Suggested mode: {report.suggested_mode}")
     if report.estimated_contrast is not None:
-        print(f"Estimated contrast: {report.estimated_contrast:.2f}:1")
+        method = f" ({report.contrast_method})" if report.contrast_method else ""
+        print(f"Estimated contrast: {report.estimated_contrast:.2f}:1{method}")
     if not dry_run:
         if report.browser_returncode != 0 or report.iterm_returncode != 0:
             return 1
