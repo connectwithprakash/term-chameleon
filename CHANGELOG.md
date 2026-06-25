@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.0a2 - 2026-06-25
+
+### Added
+
+- `term-chameleon status` readiness summary for local setup/dogfooding.
+- `term-chameleon status --json` machine-readable readiness output.
+- Optional `--live` status probes for iTerm2 Python API connectivity and front-window bounds.
+
 ## 0.1.0a1 - 2026-06-25
 
 Initial alpha release candidate for Term Chameleon.

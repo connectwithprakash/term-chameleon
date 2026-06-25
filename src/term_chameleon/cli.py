@@ -41,6 +41,7 @@ from .pixel_contrast import write_contrast_report
 from .presets import PRESETS
 from .screenshot import probe_screenshot
 from .screenshot_test import run_screenshot_test
+from .status import collect_status, status_to_json
 from .terminal_pattern import write_pattern_bundle
 from .text_contrast import write_text_contrast_report
 from .visual import write_visual_report
@@ -125,6 +126,14 @@ def main(argv: list[str] | None = None) -> int:
     check.add_argument("--output-dir", type=Path, default=Path("artifacts/check"))
     check.add_argument("--width", type=int, default=96)
     check.add_argument("--height", type=int, default=48)
+
+    status = sub.add_parser(
+        "status",
+        help="Summarize local Term Chameleon/iTerm2 readiness and recommend next step",
+    )
+    status.add_argument("--profile", type=Path, help="Dynamic Profile JSON path to inspect")
+    status.add_argument("--live", action="store_true", help="Probe live iTerm2 API/window bounds")
+    status.add_argument("--json", action="store_true", help="Emit machine-readable status JSON")
 
     watch_sim = sub.add_parser("watch-sim", help="Simulate dynamic mode selection from samples")
     watch_sim.add_argument(
@@ -301,6 +310,8 @@ def main(argv: list[str] | None = None) -> int:
             return _visual_test(args.profile, args.output_dir)
         if args.command == "check":
             return _check(output_dir=args.output_dir, width=args.width, height=args.height)
+        if args.command == "status":
+            return _status(profile=args.profile, live=args.live, json_output=args.json)
         if args.command == "watch-sim":
             return _watch_sim(args.samples, stable=args.stable)
         if args.command == "watch-live":
@@ -589,6 +600,25 @@ def _check(*, output_dir: Path, width: int, height: int) -> int:
         return 1
     print("[ok] deterministic self-check passed")
     return 0
+
+
+def _status(*, profile: Path | None, live: bool, json_output: bool) -> int:
+    report = collect_status(profile_path=profile, live=live)
+    if json_output:
+        print(status_to_json(report), end="")
+        return 0 if report.ready_for_live or not live else 1
+    print(f"Term Chameleon version: {report.version}")
+    print(f"Profile path: {report.profile_path}")
+    if report.profile_name:
+        print(f"Profile name: {report.profile_name}")
+    print("")
+    for check in report.checks:
+        marker = "ok" if check.ok else "warn"
+        print(f"[{marker}] {check.name}: {check.detail}")
+    print("")
+    print(f"Ready for live: {'yes' if report.ready_for_live else 'no'}")
+    print(f"Recommended next command: {report.recommended_next_command}")
+    return 0 if report.ready_for_live or not live else 1
 
 
 def _watch_sim(samples: list[str], *, stable: int) -> int:

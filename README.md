@@ -6,7 +6,7 @@ Glassy terminal themes look good until white text disappears over a bright windo
 
 ## Current status
 
-This repository is prepared as `v0.1.0-alpha.1` / Python package version `0.1.0a1`: an end-to-end alpha for static profile diagnostics, safe profile mutation, deterministic visual artifacts, live iTerm2 adaptation, and controlled macOS GUI/screenshot QA. Implemented:
+This repository is prepared as `v0.1.0-alpha.2` / Python package version `0.1.0a2`: an end-to-end alpha for static profile diagnostics, safe profile mutation, deterministic visual artifacts, live iTerm2 adaptation, and controlled macOS GUI/screenshot QA. Implemented:
 
 - iTerm2 Dynamic Profile JSON parsing.
 - Color conversion between hex and iTerm2 color dictionaries.
@@ -27,6 +27,7 @@ This repository is prepared as `v0.1.0-alpha.1` / Python package version `0.1.0a
 - macOS `screencapture` probe and screenshot-test artifact foundation for screenshot-based visual tests.
 - Long-running daemon packaging for continuous adaptation.
 - Permission-free deterministic self-check command for post-install validation.
+- Local readiness status command with human and JSON output.
 - Fixture tests for good and bad iTerm2 profiles.
 
 Optional future refinements:
@@ -41,7 +42,7 @@ Build and install the alpha wheel locally:
 ```bash
 uv build
 python3 -m venv /tmp/term-chameleon-alpha-venv
-/tmp/term-chameleon-alpha-venv/bin/pip install dist/term_chameleon-0.1.0a1-py3-none-any.whl
+/tmp/term-chameleon-alpha-venv/bin/pip install dist/term_chameleon-0.1.0a2-py3-none-any.whl
 /tmp/term-chameleon-alpha-venv/bin/term-chameleon check --output-dir /tmp/term-chameleon-alpha-check
 ```
 
@@ -49,10 +50,13 @@ See [CHANGELOG.md](CHANGELOG.md) for release notes.
 
 ## CLI examples
 
-Run a permission-free deterministic self-check after installation or before live GUI tests:
+Run a permission-free deterministic self-check after installation or inspect local readiness:
 
 ```bash
 term-chameleon check --output-dir artifacts/check
+term-chameleon status
+term-chameleon status --live
+term-chameleon status --json
 ```
 
 Install a balanced preset into a target directory:
