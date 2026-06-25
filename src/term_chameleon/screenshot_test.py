@@ -105,11 +105,13 @@ def run_screenshot_test(
     return report
 
 
-def analyze_image_file(path: str | Path, region: Region | None = None) -> ImageStats:
+def analyze_image_file(
+    path: str | Path, region: Region | None = None, *, max_pixels: int | None = None
+) -> ImageStats:
     image = read_image_file(path)
     if region is not None:
         image = crop_image(image, region)
-    return image_stats(image)
+    return image_stats(image, max_pixels=max_pixels)
 
 
 def read_image_file(path: str | Path):

@@ -672,7 +672,7 @@ def _install_watch_daemon(
     else:
         resolved_iterm_window = bool_value(value(daemon_cfg, "iterm_window"), False)
     daemon_interval = (
-        interval if interval is not None else float_value(value(daemon_cfg, "interval"), 2.0)
+        interval if interval is not None else float_value(value(daemon_cfg, "interval"), 10.0)
     )
     daemon_stable = stable if stable is not None else int_value(value(daemon_cfg, "stable"), 3)
     daemon_cooldown = (

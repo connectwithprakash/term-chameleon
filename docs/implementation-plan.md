@@ -139,6 +139,7 @@ Implemented/verified:
 
 - Installed the beta wheel into a durable local venv (`~/.local/share/term-chameleon/venv`), reinstalled AutoLaunch with default pid/log paths, restarted iTerm2, and verified sample artifacts plus live release gate.
 - Hardened long-running watcher behavior so transient iTerm2 apply failures (for example no current session) are logged as recoverable events instead of terminating the daemon.
+- Reduced daemon CPU usage by downsampling screenshots before luminance/variance analysis and setting the AutoLaunch default interval to 10 seconds.
 
 - Observed watcher screenshot sample artifacts over a sustained run.
-- Promoted release metadata to `0.1.0b2` / `v0.1.0-beta.2`.
+- Promoted release metadata to `0.1.0b3` / `v0.1.0-beta.3`.

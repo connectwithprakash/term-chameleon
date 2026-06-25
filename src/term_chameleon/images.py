@@ -103,8 +103,21 @@ def horizontal_gradient_image(width: int, height: int, *, left: Color, right: Co
     return RasterImage(width, height, tuple(pixels))
 
 
-def image_stats(image: RasterImage) -> ImageStats:
-    values = [pixel.relative_luminance() for pixel in image.pixels]
+def image_stats(image: RasterImage, *, max_pixels: int | None = None) -> ImageStats:
+    pixels = image.pixels
+    if max_pixels is not None:
+        if max_pixels <= 0:
+            raise ValueError("max_pixels must be positive")
+        if len(pixels) > max_pixels:
+            sample_side = max(1, math.floor(math.sqrt(max_pixels)))
+            step_x = max(1, math.ceil(image.width / sample_side))
+            step_y = max(1, math.ceil(image.height / sample_side))
+            pixels = tuple(
+                image.pixels[y * image.width + x]
+                for y in range(0, image.height, step_y)
+                for x in range(0, image.width, step_x)
+            )
+    values = [pixel.relative_luminance() for pixel in pixels]
     avg = sum(values) / len(values)
     variance = sum((value - avg) ** 2 for value in values) / len(values)
     return ImageStats(

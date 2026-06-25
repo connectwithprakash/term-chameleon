@@ -32,6 +32,30 @@ def test_checkerboard_has_high_variance():
     assert stats.luminance_variance > 0.20
 
 
+def test_image_stats_can_sample_large_images():
+    image = horizontal_gradient_image(
+        100,
+        100,
+        left=Color.from_hex("#000000"),
+        right=Color.from_hex("#FFFFFF"),
+    )
+    exact = image_stats(image)
+    sampled = image_stats(image, max_pixels=250)
+    assert abs(sampled.average_luminance - exact.average_luminance) < 0.02
+    assert sampled.min_luminance == exact.min_luminance
+    assert sampled.max_luminance > 0.95
+
+
+def test_image_stats_rejects_invalid_sample_limit():
+    image = solid_image(2, 2, Color.from_hex("#FFFFFF"))
+    try:
+        image_stats(image, max_pixels=0)
+    except ValueError as exc:
+        assert "max_pixels must be positive" in str(exc)
+    else:
+        raise AssertionError("expected ValueError")
+
+
 def test_gradient_has_expected_luminance_range():
     image = horizontal_gradient_image(
         8,

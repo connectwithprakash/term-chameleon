@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.0b3 - 2026-06-25
+
+### Fixed
+
+- Reduced long-running watcher CPU usage by downsampling screenshots before luminance/variance analysis and raising the AutoLaunch daemon's default interval to 10 seconds.
+
+### Verified
+
+- Durable AutoLaunch watcher from the installed wheel stayed running with sample artifacts and live release gate after optimization.
+
 ## 0.1.0b2 - 2026-06-25
 
 ### Fixed

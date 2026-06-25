@@ -28,6 +28,7 @@ autolaunch_dir = "~/Library/Application Support/iTerm2/Scripts/AutoLaunch"
 log_path = "~/Library/Logs/term-chameleon-watch-live.log"
 pid_path = "~/Library/Application Support/term-chameleon/watch-live.pid"
 # python = "/path/to/python"
+interval = 10.0  # Daemon default favors low overhead over rapid adaptation.
 iterm_window = false  # Keep daemon startup robust; set true to scope daemon sampling to iTerm2.
 # region = "0,0,1440,900"
 # interval, stable, cooldown, output_dir, initial_mode, iterm_window, and region

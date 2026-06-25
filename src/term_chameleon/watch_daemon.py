@@ -68,7 +68,7 @@ def read_pid(path: Path) -> int | None:
 def watch_live_command(
     *,
     executable: str | None = None,
-    interval: float = 2.0,
+    interval: float = 10.0,
     stable: int = 3,
     cooldown: float = 10.0,
     output_dir: Path = Path("~/Library/Logs/term-chameleon/watch-live-artifacts"),

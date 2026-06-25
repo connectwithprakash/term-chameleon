@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import term_chameleon.watch_live as watch_live_module
 from term_chameleon.images import Region
 from term_chameleon.iterm_window import WindowBoundsResult
 from term_chameleon.live_iterm import LiveApplyResult
@@ -16,6 +17,29 @@ class FakeClock:
 
     def sleep(self, seconds: float) -> None:
         self.now += seconds
+
+
+def test_analysis_image_path_uses_sips_downsample(monkeypatch, tmp_path):
+    source = tmp_path / "sample-0001.png"
+    source.write_bytes(b"fake-png")
+    calls = []
+
+    def fake_run(command, **_kwargs):
+        calls.append(command)
+        target = Path(command[-1])
+        target.write_bytes(b"small-png")
+
+        class Result:
+            returncode = 0
+
+        return Result()
+
+    monkeypatch.setattr(watch_live_module.shutil, "which", lambda name: "/usr/bin/sips")
+    monkeypatch.setattr(watch_live_module.subprocess, "run", fake_run)
+    result = watch_live_module._analysis_image_path(source)
+    assert result == tmp_path / "sample-0001-analysis.png"
+    assert result.read_bytes() == b"small-png"
+    assert calls[0][0] == "/usr/bin/sips"
 
 
 def test_watch_live_dry_run_switches_after_stable_samples(tmp_path):

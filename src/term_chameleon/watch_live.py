@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import shutil
+import subprocess
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -11,6 +13,9 @@ from .live_iterm import LiveApplyResult, apply_preset_to_current_session
 from .screenshot import capture_screen
 from .screenshot_test import analyze_image_file
 from .watch import ModeSelector, Sample
+
+WATCH_SAMPLE_MAX_PIXELS = 250_000
+WATCH_ANALYSIS_MAX_DIMENSION = 700
 
 
 @dataclass(frozen=True)
@@ -68,11 +73,34 @@ def screenshot_sample_provider(
     screenshot = capture_screen(path)
     if not screenshot.captured or screenshot.output_path is None:
         raise RuntimeError(f"screen capture failed: {screenshot.message}")
-    stats = analyze_image_file(screenshot.output_path, region=region)
+    analysis_path = _analysis_image_path(screenshot.output_path)
+    stats = analyze_image_file(analysis_path, region=region, max_pixels=WATCH_SAMPLE_MAX_PIXELS)
     suffix = f" region={region}" if region is not None else ""
+    analysis_suffix = (
+        "" if analysis_path == screenshot.output_path else f" analysis={analysis_path}"
+    )
     return Sample(
         stats.average_luminance, stats.luminance_variance
-    ), f"{screenshot.output_path}{suffix}"
+    ), f"{screenshot.output_path}{suffix}{analysis_suffix}"
+
+
+def _analysis_image_path(path: Path) -> Path:
+    sips = shutil.which("sips")
+    if sips is None:
+        return path
+    target = path.with_name(f"{path.stem}-analysis{path.suffix}")
+    try:
+        result = subprocess.run(
+            [sips, "-Z", str(WATCH_ANALYSIS_MAX_DIMENSION), str(path), "--out", str(target)],
+            check=False,
+            capture_output=True,
+            timeout=20,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return path
+    if result.returncode != 0 or not target.exists():
+        return path
+    return target
 
 
 def run_watch_live(
