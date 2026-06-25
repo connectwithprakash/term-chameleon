@@ -28,6 +28,43 @@ class ImageStats:
     max_luminance: float
 
 
+@dataclass(frozen=True)
+class Region:
+    x: int
+    y: int
+    width: int
+    height: int
+
+    def __post_init__(self) -> None:
+        if self.x < 0 or self.y < 0:
+            raise ValueError("region x/y must be non-negative")
+        if self.width <= 0 or self.height <= 0:
+            raise ValueError("region width/height must be positive")
+
+    @classmethod
+    def parse(cls, raw: str) -> Region:
+        parts = raw.split(",")
+        if len(parts) != 4:
+            raise ValueError("region must be x,y,width,height")
+        try:
+            x, y, width, height = (int(part.strip()) for part in parts)
+        except ValueError as exc:
+            raise ValueError("region values must be integers") from exc
+        return cls(x, y, width, height)
+
+    def clamp_to(self, image: RasterImage) -> Region:
+        if self.x >= image.width or self.y >= image.height:
+            raise ValueError(
+                f"region origin {self.x},{self.y} is outside image {image.width}x{image.height}"
+            )
+        width = min(self.width, image.width - self.x)
+        height = min(self.height, image.height - self.y)
+        return Region(self.x, self.y, width, height)
+
+    def __str__(self) -> str:
+        return f"{self.x},{self.y},{self.width},{self.height}"
+
+
 def solid_image(width: int, height: int, color: Color) -> RasterImage:
     return RasterImage(width, height, tuple(color for _ in range(width * height)))
 
@@ -76,6 +113,16 @@ def image_stats(image: RasterImage) -> ImageStats:
         min_luminance=min(values),
         max_luminance=max(values),
     )
+
+
+def crop_image(image: RasterImage, region: Region) -> RasterImage:
+    clamped = region.clamp_to(image)
+    pixels = []
+    for y in range(clamped.y, clamped.y + clamped.height):
+        start = y * image.width + clamped.x
+        end = start + clamped.width
+        pixels.extend(image.pixels[start:end])
+    return RasterImage(clamped.width, clamped.height, tuple(pixels))
 
 
 def write_ppm(path: str | Path, image: RasterImage) -> Path:

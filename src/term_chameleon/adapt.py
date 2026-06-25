@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from .images import Region
+from .iterm_window import get_iterm_window_bounds
 from .modes import ModeChange, apply_mode
 from .screenshot import ScreenshotResult, capture_screen
 from .screenshot_test import analyze_image_file
@@ -17,13 +19,27 @@ class AdaptDecision:
     suggested_mode: str
     reason: str
     source: Path
+    region: Region | None = None
     screenshot: ScreenshotResult | None = None
     mode_result: tuple[list[ModeChange], list] | None = None
 
 
-def decide_from_image(path: str | Path) -> AdaptDecision:
+def resolve_region(region: Region | None = None, *, iterm_window: bool = False) -> Region | None:
+    if region is not None and iterm_window:
+        raise ValueError("use either --region or --iterm-window, not both")
+    if not iterm_window:
+        return region
+    result = get_iterm_window_bounds()
+    if not result.available or result.region is None:
+        raise RuntimeError(
+            f"could not read iTerm2 window bounds: {result.message}; use --region x,y,w,h"
+        )
+    return result.region
+
+
+def decide_from_image(path: str | Path, region: Region | None = None) -> AdaptDecision:
     source = Path(path)
-    stats = analyze_image_file(source)
+    stats = analyze_image_file(source, region=region)
     classification = classify_sample(Sample(stats.average_luminance, stats.luminance_variance))
     return AdaptDecision(
         average_luminance=stats.average_luminance,
@@ -32,14 +48,15 @@ def decide_from_image(path: str | Path) -> AdaptDecision:
         suggested_mode=RISK_TO_MODE[classification.risk],
         reason=classification.reason,
         source=source,
+        region=region,
     )
 
 
-def decide_from_screen(output_path: str | Path) -> AdaptDecision:
+def decide_from_screen(output_path: str | Path, region: Region | None = None) -> AdaptDecision:
     screenshot = capture_screen(output_path)
     if not screenshot.captured or screenshot.output_path is None:
         raise RuntimeError(f"screen capture failed: {screenshot.message}")
-    decision = decide_from_image(screenshot.output_path)
+    decision = decide_from_image(screenshot.output_path, region=region)
     return AdaptDecision(
         average_luminance=decision.average_luminance,
         luminance_variance=decision.luminance_variance,
@@ -47,6 +64,7 @@ def decide_from_screen(output_path: str | Path) -> AdaptDecision:
         suggested_mode=decision.suggested_mode,
         reason=decision.reason,
         source=decision.source,
+        region=decision.region,
         screenshot=screenshot,
     )
 
@@ -55,10 +73,11 @@ def adapt_profile_from_image(
     image_path: str | Path,
     profile_path: str | Path,
     *,
+    region: Region | None = None,
     dry_run: bool = True,
     yes: bool = False,
 ) -> AdaptDecision:
-    decision = decide_from_image(image_path)
+    decision = decide_from_image(image_path, region=region)
     result = apply_mode(profile_path, decision.suggested_mode, dry_run=dry_run, yes=yes)
     return _with_mode_result(decision, result)
 
@@ -67,10 +86,11 @@ def adapt_profile_from_screen(
     profile_path: str | Path,
     screenshot_path: str | Path,
     *,
+    region: Region | None = None,
     dry_run: bool = True,
     yes: bool = False,
 ) -> AdaptDecision:
-    decision = decide_from_screen(screenshot_path)
+    decision = decide_from_screen(screenshot_path, region=region)
     result = apply_mode(profile_path, decision.suggested_mode, dry_run=dry_run, yes=yes)
     return _with_mode_result(decision, result)
 
@@ -85,6 +105,7 @@ def _with_mode_result(
         suggested_mode=decision.suggested_mode,
         reason=decision.reason,
         source=decision.source,
+        region=decision.region,
         screenshot=decision.screenshot,
         mode_result=result,
     )

@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from term_chameleon.images import Region
 from term_chameleon.live_iterm import LiveApplyResult
 from term_chameleon.watch import Sample
 from term_chameleon.watch_live import WatchLiveConfig, run_watch_live
@@ -19,7 +20,7 @@ class FakeClock:
 def test_watch_live_dry_run_switches_after_stable_samples(tmp_path):
     samples = [Sample(0.8), Sample(0.8), Sample(0.8)]
 
-    def provider(index: int, _output_dir: Path):
+    def provider(index: int, _output_dir: Path, _region):
         return samples[index - 1], f"sample-{index}"
 
     clock = FakeClock()
@@ -48,7 +49,7 @@ def test_watch_live_applies_when_not_dry_run(tmp_path):
     samples = [Sample(0.8)]
     applied = []
 
-    def provider(index: int, _output_dir: Path):
+    def provider(index: int, _output_dir: Path, _region):
         return samples[index - 1], f"sample-{index}"
 
     def apply(mode: str) -> LiveApplyResult:
@@ -78,7 +79,7 @@ def test_watch_live_applies_when_not_dry_run(tmp_path):
 def test_watch_live_cooldown_holds_second_switch(tmp_path):
     samples = [Sample(0.8), Sample(0.2)]
 
-    def provider(index: int, _output_dir: Path):
+    def provider(index: int, _output_dir: Path, _region):
         return samples[index - 1], f"sample-{index}"
 
     clock = FakeClock()
@@ -101,3 +102,30 @@ def test_watch_live_cooldown_holds_second_switch(tmp_path):
     assert events[1].switched is False
     assert events[1].mode == "bright-safe"
     assert "cooldown active" in events[1].message
+
+
+def test_watch_live_passes_region_to_sample_provider(tmp_path):
+    seen = []
+
+    def provider(_index: int, _output_dir: Path, region):
+        seen.append(region)
+        return Sample(0.2), "sample"
+
+    clock = FakeClock()
+    region = Region(1, 2, 3, 4)
+    run_watch_live(
+        WatchLiveConfig(
+            interval=1,
+            duration=0.1,
+            stable=1,
+            cooldown=10,
+            output_dir=tmp_path,
+            dry_run=True,
+            initial_mode="balanced",
+            region=region,
+        ),
+        sample_provider=provider,
+        sleep=clock.sleep,
+        clock=clock,
+    )
+    assert seen == [region]

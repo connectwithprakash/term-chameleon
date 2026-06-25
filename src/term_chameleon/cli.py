@@ -10,11 +10,13 @@ from .adapt import (
     adapt_profile_from_screen,
     decide_from_image,
     decide_from_screen,
+    resolve_region,
 )
 from .background_html import open_file, write_background_html
 from .diagnostics import diagnose
 from .e2e_stage import run_e2e_stage
 from .fixes import fix_file
+from .images import Region
 from .install import (
     DEFAULT_AUTOLAUNCH_DIR,
     DEFAULT_DYNAMIC_PROFILES_DIR,
@@ -29,6 +31,7 @@ from .iterm_api import (
 )
 from .iterm_connection import probe_iterm_connection
 from .iterm_profile import load_profile, loads_document
+from .iterm_window import get_iterm_window_bounds
 from .modes import apply_mode
 from .osc import reset_sequences, sequences_for_preset, shell_printf
 from .presets import PRESETS
@@ -93,6 +96,11 @@ def main(argv: list[str] | None = None) -> int:
     watch_live.add_argument("--cooldown", type=float, default=10.0)
     watch_live.add_argument("--output-dir", type=Path, default=Path("artifacts/watch-live"))
     watch_live.add_argument("--initial-mode", choices=sorted(PRESETS), default="balanced")
+    region_group = watch_live.add_mutually_exclusive_group()
+    region_group.add_argument("--region", help="Screen region as x,y,width,height")
+    region_group.add_argument(
+        "--iterm-window", action="store_true", help="Sample the front iTerm2 window bounds"
+    )
     watch_live.add_argument("--dry-run", action="store_true")
     watch_live.add_argument(
         "--yes", action="store_true", help="Actually mutate the current iTerm2 session"
@@ -100,6 +108,9 @@ def main(argv: list[str] | None = None) -> int:
 
     sub.add_parser("iterm-api-check", help="Check local iTerm2 Python API readiness")
     sub.add_parser("iterm-connect-probe", help="Attempt to connect to the live iTerm2 Python API")
+    sub.add_parser(
+        "iterm-window-bounds", help="Read the front iTerm2 window bounds via Accessibility"
+    )
 
     iterm_script = sub.add_parser(
         "iterm-live-script", help="Generate a conservative iTerm2 session-local adapter script"
@@ -143,6 +154,11 @@ def main(argv: list[str] | None = None) -> int:
     sample_source.add_argument("--image", type=Path)
     sample_source.add_argument("--screen", action="store_true")
     sample.add_argument("--output", type=Path, default=Path("artifacts/adapt/screen.png"))
+    sample_region = sample.add_mutually_exclusive_group()
+    sample_region.add_argument("--region", help="Analyze only x,y,width,height")
+    sample_region.add_argument(
+        "--iterm-window", action="store_true", help="Analyze the front iTerm2 window bounds"
+    )
 
     adapt = sub.add_parser(
         "adapt-once", help="Sample image/screen and apply suggested mode to a profile"
@@ -152,6 +168,11 @@ def main(argv: list[str] | None = None) -> int:
     adapt_source.add_argument("--image", type=Path)
     adapt_source.add_argument("--screen", action="store_true")
     adapt.add_argument("--output", type=Path, default=Path("artifacts/adapt/screen.png"))
+    adapt_region = adapt.add_mutually_exclusive_group()
+    adapt_region.add_argument("--region", help="Analyze only x,y,width,height")
+    adapt_region.add_argument(
+        "--iterm-window", action="store_true", help="Analyze the front iTerm2 window bounds"
+    )
     adapt.add_argument("--dry-run", action="store_true")
     adapt.add_argument("--yes", action="store_true")
 
@@ -186,6 +207,8 @@ def main(argv: list[str] | None = None) -> int:
                 cooldown=args.cooldown,
                 output_dir=args.output_dir,
                 initial_mode=args.initial_mode,
+                region=args.region,
+                iterm_window=args.iterm_window,
                 dry_run=args.dry_run,
                 yes=args.yes,
             )
@@ -193,6 +216,8 @@ def main(argv: list[str] | None = None) -> int:
             return _iterm_api_check()
         if args.command == "iterm-connect-probe":
             return _iterm_connect_probe()
+        if args.command == "iterm-window-bounds":
+            return _iterm_window_bounds()
         if args.command == "iterm-live-script":
             return _iterm_live_script(args.preset, output=args.output)
         if args.command == "screenshot-probe":
@@ -217,13 +242,21 @@ def main(argv: list[str] | None = None) -> int:
                 height=args.height,
             )
         if args.command == "sample":
-            return _sample(image=args.image, screen=args.screen, output=args.output)
+            return _sample(
+                image=args.image,
+                screen=args.screen,
+                output=args.output,
+                region=args.region,
+                iterm_window=args.iterm_window,
+            )
         if args.command == "adapt-once":
             return _adapt_once(
                 profile=args.profile,
                 image=args.image,
                 screen=args.screen,
                 output=args.output,
+                region=args.region,
+                iterm_window=args.iterm_window,
                 dry_run=args.dry_run,
                 yes=args.yes,
             )
@@ -364,6 +397,8 @@ def _watch_live(
     cooldown: float,
     output_dir: Path,
     initial_mode: str,
+    region: str | None,
+    iterm_window: bool,
     dry_run: bool,
     yes: bool,
 ) -> int:
@@ -378,6 +413,8 @@ def _watch_live(
         output_dir=output_dir,
         dry_run=dry_run,
         initial_mode=initial_mode,
+        region=Region.parse(region) if region else None,
+        iterm_window=iterm_window,
     )
     events = run_watch_live(config)
     for event in events:
@@ -439,6 +476,18 @@ def _iterm_connect_probe() -> int:
         return 0
     print("[warn] could not connect to live iTerm2 Python API")
     print("[hint] start iTerm2 and enable Preferences > General > Magic > Python API")
+    return 1
+
+
+def _iterm_window_bounds() -> int:
+    result = get_iterm_window_bounds()
+    if result.available and result.region is not None:
+        print(str(result.region))
+        print("[ok] read iTerm2 window bounds")
+        return 0
+    print(result.message)
+    print("[warn] could not read iTerm2 window bounds")
+    print("[hint] grant Accessibility permission or pass --region x,y,width,height")
     return 1
 
 
@@ -515,8 +564,24 @@ def _e2e_stage(*, profile: Path, output_dir: Path, capture: bool, width: int, he
     return 0
 
 
-def _sample(*, image: Path | None, screen: bool, output: Path) -> int:
-    decision = decide_from_screen(output) if screen else decide_from_image(_require_path(image))
+def _sample(
+    *,
+    image: Path | None,
+    screen: bool,
+    output: Path,
+    region: str | None,
+    iterm_window: bool,
+) -> int:
+    resolved_region = resolve_region(
+        Region.parse(region) if region else None, iterm_window=iterm_window
+    )
+    if iterm_window and not screen:
+        raise ValueError("--iterm-window requires --screen; use --region for image files")
+    decision = (
+        decide_from_screen(output, region=resolved_region)
+        if screen
+        else decide_from_image(_require_path(image), region=resolved_region)
+    )
     _print_decision(decision)
     return 0
 
@@ -527,16 +592,25 @@ def _adapt_once(
     image: Path | None,
     screen: bool,
     output: Path,
+    region: str | None,
+    iterm_window: bool,
     dry_run: bool,
     yes: bool,
 ) -> int:
     if not dry_run and not yes:
         print("Refusing to write without --yes. Use --dry-run to preview.", file=sys.stderr)
         return 2
+    resolved_region = resolve_region(
+        Region.parse(region) if region else None, iterm_window=iterm_window
+    )
+    if iterm_window and not screen:
+        raise ValueError("--iterm-window requires --screen; use --region for image files")
     decision = (
-        adapt_profile_from_screen(profile, output, dry_run=dry_run, yes=yes)
+        adapt_profile_from_screen(profile, output, region=resolved_region, dry_run=dry_run, yes=yes)
         if screen
-        else adapt_profile_from_image(_require_path(image), profile, dry_run=dry_run, yes=yes)
+        else adapt_profile_from_image(
+            _require_path(image), profile, region=resolved_region, dry_run=dry_run, yes=yes
+        )
     )
     _print_decision(decision)
     if decision.mode_result is not None:
@@ -549,6 +623,8 @@ def _adapt_once(
 
 def _print_decision(decision) -> None:
     print(f"Source: {decision.source}")
+    if getattr(decision, "region", None) is not None:
+        print(f"Region: {decision.region}")
     print(f"Average luminance: {decision.average_luminance:.3f}")
     print(f"Luminance variance: {decision.luminance_variance:.3f}")
     print(f"Risk: {decision.risk}")

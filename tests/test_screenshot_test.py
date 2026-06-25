@@ -1,6 +1,7 @@
 import json
 
 from term_chameleon.cli import main
+from term_chameleon.images import Region
 from term_chameleon.screenshot_test import (
     analyze_image_file,
     generate_background_artifacts,
@@ -35,6 +36,14 @@ def test_analyze_image_file_supports_ppm(tmp_path):
     dark = next(artifact for artifact in artifacts if artifact.name == "solid-dark")
     stats = analyze_image_file(dark.path)
     assert stats.average_luminance < 0.01
+
+
+def test_analyze_image_file_supports_region(tmp_path):
+    artifacts = generate_background_artifacts(tmp_path, width=64, height=8)
+    gradient = next(artifact for artifact in artifacts if artifact.name == "gradient")
+    left = analyze_image_file(gradient.path, region=Region(0, 0, 8, 8))
+    right = analyze_image_file(gradient.path, region=Region(56, 0, 8, 8))
+    assert left.average_luminance < right.average_luminance
 
 
 def test_screenshot_test_cli_without_capture(tmp_path, capsys):

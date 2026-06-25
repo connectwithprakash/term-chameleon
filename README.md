@@ -55,6 +55,7 @@ Check iTerm2 Python API readiness and generate a conservative session-local adap
 ```bash
 term-chameleon iterm-api-check
 term-chameleon iterm-connect-probe
+term-chameleon iterm-window-bounds
 term-chameleon iterm-live-script --preset balanced --output /tmp/term-chameleon-live.py
 ```
 
@@ -69,9 +70,12 @@ term-chameleon background-html --output-dir artifacts/background-html
 term-chameleon pattern-script --output-dir artifacts/pattern-script
 term-chameleon e2e-stage tests/fixtures/iterm/good-dark-glass.json --output-dir artifacts/e2e-stage
 term-chameleon sample --screen --output artifacts/adapt/screen.png
+term-chameleon sample --screen --iterm-window --output artifacts/adapt/iterm-window.png
+term-chameleon sample --screen --region 0,0,800,600 --output artifacts/adapt/region.png
 term-chameleon adapt-once tests/fixtures/iterm/good-dark-glass.json --screen --dry-run
 term-chameleon watch-live --dry-run --duration 10 --interval 1 --stable 2
-term-chameleon watch-live --yes --duration 30 --interval 2 --stable 3 --cooldown 10
+term-chameleon watch-live --dry-run --iterm-window --duration 10 --interval 1 --stable 2
+term-chameleon watch-live --yes --iterm-window --duration 30 --interval 2 --stable 3 --cooldown 10
 ```
 
 Manual live smoke test, once iTerm2 is running and the Python API is enabled:

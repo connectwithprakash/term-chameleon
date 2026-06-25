@@ -7,7 +7,9 @@ from pathlib import Path
 from .color import Color
 from .images import (
     ImageStats,
+    Region,
     checkerboard_image,
+    crop_image,
     horizontal_gradient_image,
     image_stats,
     solid_image,
@@ -103,17 +105,22 @@ def run_screenshot_test(
     return report
 
 
-def analyze_image_file(path: str | Path) -> ImageStats:
+def analyze_image_file(path: str | Path, region: Region | None = None) -> ImageStats:
+    image = read_image_file(path)
+    if region is not None:
+        image = crop_image(image, region)
+    return image_stats(image)
+
+
+def read_image_file(path: str | Path):
     source = Path(path)
     if source.suffix.lower() == ".ppm":
         from .images import read_ppm
 
-        image = read_ppm(source)
-    elif source.suffix.lower() == ".png":
-        image = read_png(source)
-    else:
-        raise ValueError(f"unsupported image format for analysis: {source.suffix}")
-    return image_stats(image)
+        return read_ppm(source)
+    if source.suffix.lower() == ".png":
+        return read_png(source)
+    raise ValueError(f"unsupported image format for analysis: {source.suffix}")
 
 
 def write_report(report: ScreenshotTestReport) -> tuple[Path, Path]:
