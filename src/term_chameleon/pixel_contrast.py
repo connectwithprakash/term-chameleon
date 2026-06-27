@@ -67,7 +67,7 @@ def estimate_raster_contrast(
     pixels = sorted(image.pixels, key=lambda color: color.relative_luminance())
     if len(pixels) < 2:
         raise ValueError("contrast estimation needs at least two pixels")
-    sample_size = max(1, round(len(pixels) * percentile))
+    sample_size = max(1, min(round(len(pixels) * percentile), len(pixels) // 2))
     dark = _mean_color(pixels[:sample_size])
     light = _mean_color(pixels[-sample_size:])
     contrast = contrast_ratio(light, dark)

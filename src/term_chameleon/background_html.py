@@ -95,5 +95,22 @@ def render_index(artifacts: list[HtmlBackgroundArtifact]) -> str:
 """
 
 
-def open_file(path: str | Path) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(["open", str(Path(path))], check=False, text=True, capture_output=True)
+def open_file(path: str | Path, timeout: float = 10.0) -> subprocess.CompletedProcess[str]:
+    """Launch *path* with macOS `open`, bounded by *timeout* seconds.
+
+    If `open` does not return within *timeout* seconds (e.g. Launch Services
+    wedged or a GUI app mid-launch), a TimeoutExpired is raised and re-raised
+    as RuntimeError so the CLI error handler can report it cleanly.
+    """
+    try:
+        return subprocess.run(
+            ["open", str(Path(path))],
+            check=False,
+            text=True,
+            capture_output=True,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(
+            f"open timed out after {timeout}s waiting for {path}"
+        ) from exc

@@ -48,6 +48,11 @@ class ItermProfile:
         return self.color("Foreground Color")
 
     def color(self, key: str) -> Color | None:
+        """Return Color if key is present and parseable, None if key is absent.
+
+        When the key is present but the dict is malformed, still returns None
+        so callers don't raise, but `is_color_malformed` can distinguish the case.
+        """
         value = self.profile.get(key)
         if isinstance(value, dict):
             try:
@@ -55,6 +60,20 @@ class ItermProfile:
             except (ValueError, TypeError):
                 return None
         return None
+
+    def is_color_malformed(self, key: str) -> bool:
+        """Return True when the color key is present as a dict but unparseable.
+
+        Distinguishes 'key absent' (False) from 'key present but corrupt' (True).
+        """
+        value = self.profile.get(key)
+        if not isinstance(value, dict):
+            return False
+        try:
+            Color.from_iterm_dict(value)
+            return False
+        except (ValueError, TypeError):
+            return True
 
     def set_color(self, key: str, color: Color) -> None:
         self.profile[key] = color.to_iterm_dict()

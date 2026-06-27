@@ -6,6 +6,8 @@ from term_chameleon.watch import Sample
 from term_chameleon.watch_daemon import (
     get_watch_daemon_status,
     install_watch_autolaunch_script,
+    pid_is_running,
+    read_pid,
     shell_command,
     uninstall_watch_autolaunch_script,
     watch_autolaunch_script,
@@ -301,3 +303,147 @@ def test_cooldown_revert_preserves_candidate_state(tmp_path):
         "candidate count should have been preserved by the cooldown revert fix."
     )
     assert events[4].mode == "dark-glass"
+
+
+# ---------------------------------------------------------------------------
+# pid_is_running: reject non-positive PIDs (Finding R2-watch #7)
+# ---------------------------------------------------------------------------
+
+
+def test_pid_is_running_rejects_zero():
+    """pid_is_running(0) must return False without calling os.kill(0, 0),
+    which would target the current process group and always succeed.
+    """
+    assert pid_is_running(0) is False
+
+
+def test_pid_is_running_rejects_negative():
+    """pid_is_running(-1) must return False; os.kill(-1, 0) targets all
+    signalable processes and always succeeds.
+    """
+    assert pid_is_running(-1) is False
+
+
+def test_pid_is_running_accepts_current_process():
+    """pid_is_running returns True for the current process (a valid positive PID)."""
+    import os
+
+    assert pid_is_running(os.getpid()) is True
+
+
+# ---------------------------------------------------------------------------
+# read_pid: reject non-positive PIDs written to file
+# ---------------------------------------------------------------------------
+
+
+def test_read_pid_rejects_zero(tmp_path):
+    pid_file = tmp_path / "watch.pid"
+    pid_file.write_text("0\n", encoding="utf-8")
+    assert read_pid(pid_file) is None
+
+
+def test_read_pid_rejects_negative(tmp_path):
+    pid_file = tmp_path / "watch.pid"
+    pid_file.write_text("-1\n", encoding="utf-8")
+    assert read_pid(pid_file) is None
+
+
+def test_read_pid_accepts_valid(tmp_path):
+    import os
+
+    pid_file = tmp_path / "watch.pid"
+    pid_file.write_text(f"{os.getpid()}\n", encoding="utf-8")
+    assert read_pid(pid_file) == os.getpid()
+
+
+# ---------------------------------------------------------------------------
+# Generated autolaunch script: pid<=0 guard + TC_WATCH_PID_PATH env var
+# (Finding R2-watch #5 and #7)
+# ---------------------------------------------------------------------------
+
+
+def test_autolaunch_script_has_pid_le_zero_guard():
+    """The generated script must guard against non-positive PIDs in both
+    _pid_is_running and _existing_watcher_running.
+    """
+    script = watch_autolaunch_script(
+        command=("python", "-m", "term_chameleon.cli", "watch-live", "--yes"),
+        log_path=Path("/tmp/watch.log"),
+        pid_path=Path("/tmp/watch.pid"),
+    )
+    assert "if pid <= 0:" in script, "generated script must reject pid <= 0"
+
+
+def test_autolaunch_script_sets_tc_watch_pid_path_env():
+    """The generated script must pass TC_WATCH_PID_PATH to the child process
+    so that the watch-live process owns and cleans up the PID file.
+    """
+    script = watch_autolaunch_script(
+        command=("python", "-m", "term_chameleon.cli", "watch-live", "--yes"),
+        log_path=Path("/tmp/watch.log"),
+        pid_path=Path("/tmp/watch.pid"),
+    )
+    assert "TC_WATCH_PID_PATH" in script, (
+        "generated script must set TC_WATCH_PID_PATH so the child owns its PID file"
+    )
+    assert 'env["TC_WATCH_PID_PATH"]' in script or "env['TC_WATCH_PID_PATH']" in script
+
+
+def test_autolaunch_script_does_not_write_pid_itself():
+    """The generated script must NOT write the PID file directly; the child
+    process (watch-live) owns the PID file via TC_WATCH_PID_PATH.
+    """
+    script = watch_autolaunch_script(
+        command=("python", "-m", "term_chameleon.cli", "watch-live", "--yes"),
+        log_path=Path("/tmp/watch.log"),
+        pid_path=Path("/tmp/watch.pid"),
+    )
+    # PID_PATH.write_text must not appear after the main() function body
+    main_body = script.split("def main()")[1]
+    assert "PID_PATH.write_text" not in main_body, (
+        "generated script must not write PID itself; child process owns the PID file"
+    )
+
+
+def test_autolaunch_script_compiles_with_new_guards():
+    """Ensure the updated generated script is still valid Python."""
+    script = watch_autolaunch_script(
+        command=("python", "-m", "term_chameleon.cli", "watch-live", "--yes"),
+        log_path=Path("/tmp/watch.log"),
+        pid_path=Path("/tmp/watch.pid"),
+    )
+    compile(script, "watch_autolaunch.py", "exec")
+
+
+# ---------------------------------------------------------------------------
+# _setup_pid_ownership: writes PID and registers atexit cleanup
+# (Finding R2-watch #5)
+# ---------------------------------------------------------------------------
+
+
+def test_setup_pid_ownership_writes_pid_from_env(tmp_path, monkeypatch):
+    """When TC_WATCH_PID_PATH is set, _setup_pid_ownership writes the current
+    PID to that path at startup.
+    """
+    import os
+
+    pid_file = tmp_path / "test.pid"
+    monkeypatch.setenv("TC_WATCH_PID_PATH", str(pid_file))
+
+    from term_chameleon.watch_live import _setup_pid_ownership
+
+    _setup_pid_ownership()
+
+    assert pid_file.exists(), "PID file must be written when TC_WATCH_PID_PATH is set"
+    written = pid_file.read_text(encoding="utf-8").strip()
+    assert written == str(os.getpid()), f"PID file must contain current PID; got {written!r}"
+
+
+def test_setup_pid_ownership_noop_without_env(tmp_path, monkeypatch):
+    """When TC_WATCH_PID_PATH is not set, _setup_pid_ownership is a no-op."""
+    monkeypatch.delenv("TC_WATCH_PID_PATH", raising=False)
+
+    from term_chameleon.watch_live import _setup_pid_ownership
+
+    _setup_pid_ownership()
+    assert not list(tmp_path.iterdir()), "no files should be created without TC_WATCH_PID_PATH"

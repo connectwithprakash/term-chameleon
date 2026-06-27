@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import atexit
+import collections
 import contextlib
+import logging
+import os
 import shutil
 import subprocess
 import time
@@ -18,6 +22,11 @@ from .watch import ModeSelector, Sample
 WATCH_SAMPLE_MAX_PIXELS = 250_000
 WATCH_ANALYSIS_MAX_DIMENSION = 700
 WATCH_MAX_ARTIFACTS = 200
+# Maximum events kept in memory for the return value (ring buffer).
+# The daemon runs indefinitely; storing all events would exhaust RAM.
+WATCH_MAX_EVENTS_BUFFER = 1000
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -106,18 +115,51 @@ def _analysis_image_path(path: Path) -> Path:
 
 
 def _prune_artifacts(output_dir: Path, *, max_artifacts: int = WATCH_MAX_ARTIFACTS) -> None:
+    """Remove the oldest real samples (and their paired analysis files) so that
+    at most *max_artifacts* real sample files remain.
+
+    Only files that do NOT have the ``-analysis`` suffix are counted toward the
+    cap; their ``-analysis`` companions are deleted alongside them.
+    """
     try:
-        files = sorted(output_dir.glob("sample-*.png"), key=lambda p: p.stat().st_mtime)
+        all_png = sorted(output_dir.glob("sample-*.png"), key=lambda p: p.stat().st_mtime)
     except OSError:
         return
-    while len(files) > max_artifacts:
-        oldest = files.pop(0)
+    # Keep only real samples in the count; exclude -analysis companions.
+    samples = [p for p in all_png if not p.stem.endswith("-analysis")]
+    while len(samples) > max_artifacts:
+        oldest = samples.pop(0)
         with contextlib.suppress(OSError):
             oldest.unlink(missing_ok=True)
+        # Also remove the paired analysis file if it exists.
         analysis = oldest.with_name(f"{oldest.stem}-analysis.png")
-        if analysis.exists():
-            with contextlib.suppress(OSError):
-                analysis.unlink()
+        with contextlib.suppress(OSError):
+            analysis.unlink(missing_ok=True)
+
+
+def _setup_pid_ownership() -> None:
+    """Write this process's PID to the path given by the TC_WATCH_PID_PATH env var.
+
+    Called once at the start of :func:`run_watch_live`.  The file is removed
+    via :mod:`atexit` when the process exits, so the duplicate-launch guard in
+    the generated AutoLaunch script does not mistake a recycled PID for a live
+    watcher.
+    """
+    pid_path_str = os.environ.get("TC_WATCH_PID_PATH")
+    if not pid_path_str:
+        return
+    pid_path = Path(pid_path_str).expanduser()
+    try:
+        pid_path.parent.mkdir(parents=True, exist_ok=True)
+        pid_path.write_text(str(os.getpid()) + "\n", encoding="utf-8")
+    except OSError:
+        return
+
+    def _remove_pid() -> None:
+        with contextlib.suppress(OSError):
+            pid_path.unlink(missing_ok=True)
+
+    atexit.register(_remove_pid)
 
 
 def run_watch_live(
@@ -129,6 +171,7 @@ def run_watch_live(
     clock: Clock = time.monotonic,
     window_bounds_provider: WindowBoundsProvider = get_iterm_window_bounds,
 ) -> list[WatchLiveEvent]:
+    _setup_pid_ownership()
     selector = ModeSelector(current_mode=config.initial_mode, stable_samples_required=config.stable)
     region = config.region
     if config.iterm_window:
@@ -140,7 +183,11 @@ def run_watch_live(
         )
     start = clock()
     next_allowed_switch = start
-    events: list[WatchLiveEvent] = []
+    # Bounded ring buffer: keeps at most WATCH_MAX_EVENTS_BUFFER events in
+    # memory so the long-running daemon does not exhaust RAM.
+    events: collections.deque[WatchLiveEvent] = collections.deque(
+        maxlen=WATCH_MAX_EVENTS_BUFFER
+    )
     index = 0
 
     while True:
@@ -183,27 +230,46 @@ def run_watch_live(
                     applied = result.applied
             next_allowed_switch = now + config.cooldown
 
-        events.append(
-            WatchLiveEvent(
-                index=index,
-                elapsed=now - start,
-                luminance=sample.luminance,
-                variance=sample.variance,
-                risk=classification.risk,
-                mode=mode,
-                candidate_mode=candidate_mode,
-                switched=switched,
-                applied=applied,
-                reason=classification.reason,
-                message=message,
-            )
+        event = WatchLiveEvent(
+            index=index,
+            elapsed=now - start,
+            luminance=sample.luminance,
+            variance=sample.variance,
+            risk=classification.risk,
+            mode=mode,
+            candidate_mode=candidate_mode,
+            switched=switched,
+            applied=applied,
+            reason=classification.reason,
+            message=message,
+        )
+        events.append(event)
+
+        # Emit each event immediately so the log file is populated live even
+        # when the loop runs indefinitely (daemon mode with --duration=315360000).
+        marker = "switch" if event.switched else "hold"
+        apply_marker = " applied" if event.applied else ""
+        logger.info(
+            "%d: t=%.1fs lum=%.3f var=%.3f risk=%s candidate=%s mode=%s %s%s "
+            "reason=%s message=%s",
+            event.index,
+            event.elapsed,
+            event.luminance,
+            event.variance,
+            event.risk,
+            event.candidate_mode,
+            event.mode,
+            marker,
+            apply_marker,
+            event.reason,
+            event.message,
         )
 
         if clock() - start >= config.duration:
             break
         sleep(config.interval)
 
-    return events
+    return list(events)
 
 
 def _wait_for_iterm_window_bounds(

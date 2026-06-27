@@ -132,6 +132,59 @@ def test_background_fallback_uses_set_based_lookup():
     assert estimate.background_color == "#808080"
 
 
+def test_otsu_threshold_lands_between_clusters():
+    """Regression: _otsu_threshold must return the inter-class boundary, not a bin center.
+
+    A bimodal histogram with two clearly separated clusters must produce a threshold
+    that lies strictly BETWEEN the two cluster means, not at or near either cluster.
+    """
+    from term_chameleon.text_contrast import _otsu_threshold
+
+    # Symmetric bimodal: cluster A centred at 0.2, cluster B centred at 0.8.
+    values = [0.2] * 100 + [0.8] * 100
+    t = _otsu_threshold(values)
+    assert 0.2 < t < 0.8, f"threshold {t} not between clusters 0.2 and 0.8"
+    # Should be very close to the midpoint 0.5.
+    assert abs(t - 0.5) < 0.05, f"threshold {t} too far from expected midpoint 0.5"
+
+    # Asymmetric bimodal: minority dark cluster vs majority light cluster.
+    dark_values = [0.02] * 100
+    light_values = [0.9] * 900
+    t2 = _otsu_threshold(dark_values + light_values)
+    assert 0.02 < t2 < 0.9, f"threshold {t2} not between clusters 0.02 and 0.9"
+
+
+def test_estimate_raster_text_contrast_dark_text_on_light_background():
+    """Regression: dark glyphs on a light background must not be inverted.
+
+    When the text colour is darker than the background, the Otsu-based adaptive
+    classifier must identify the dark pixels as glyphs (foreground) and the light
+    pixels as background — not the other way around.
+    """
+    dark_glyph = Color.from_hex("#202020")
+    light_bg = Color.from_hex("#E8E8E8")
+
+    # 10 wide x 3 tall; 2 dark glyph pixels per row, 8 light background pixels per row.
+    pixels = tuple(
+        dark_glyph if x < 2 else light_bg for y in range(3) for x in range(10)
+    )
+    image = RasterImage(10, 3, tuple(pixels))
+
+    estimate = estimate_raster_text_contrast(
+        image, min_row_delta=0.05, glyph_delta=0.08, adaptive=True
+    )
+
+    assert estimate.foreground_color == "#202020", (
+        f"foreground was {estimate.foreground_color!r}, expected #202020 (dark glyph)"
+    )
+    assert estimate.background_color == "#E8E8E8", (
+        f"background was {estimate.background_color!r}, expected #E8E8E8 (light bg)"
+    )
+    assert estimate.glyph_pixels == 6, (
+        f"glyph_pixels={estimate.glyph_pixels}, expected 6 (2 per row * 3 rows)"
+    )
+
+
 def test_screenshot_text_contrast_cli(tmp_path, capsys):
     path = write_ppm(tmp_path / "text.ppm", text_like_image())
     assert (

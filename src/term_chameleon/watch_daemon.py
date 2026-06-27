@@ -55,6 +55,11 @@ class WatchDaemonUninstall:
 
 
 def pid_is_running(pid: int) -> bool:
+    if pid <= 0:
+        # os.kill(0, 0) targets the process group; os.kill(-1, 0) targets all
+        # processes the user may signal.  Both would return True spuriously, so
+        # reject non-positive PIDs as not-running.
+        return False
     try:
         os.kill(pid, 0)
     except ProcessLookupError:
@@ -66,9 +71,12 @@ def pid_is_running(pid: int) -> bool:
 
 def read_pid(path: Path) -> int | None:
     try:
-        return int(path.expanduser().read_text(encoding="utf-8").strip())
+        pid = int(path.expanduser().read_text(encoding="utf-8").strip())
     except (FileNotFoundError, ValueError):
         return None
+    if pid <= 0:
+        return None
+    return pid
 
 
 def validate_executable(executable: str) -> None:
@@ -168,6 +176,9 @@ PID_PATH = Path({str(pid_path)!r}).expanduser()
 
 
 def _pid_is_running(pid: int) -> bool:
+    if pid <= 0:
+        # os.kill(0, 0) / os.kill(-1, 0) would succeed spuriously.
+        return False
     try:
         os.kill(pid, 0)
     except ProcessLookupError:
@@ -182,6 +193,8 @@ def _existing_watcher_running() -> bool:
         pid = int(PID_PATH.read_text().strip())
     except (FileNotFoundError, ValueError):
         return False
+    if pid <= 0:
+        return False
     return _pid_is_running(pid)
 
 
@@ -190,14 +203,19 @@ def main() -> None:
         return
     LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
     PID_PATH.parent.mkdir(parents=True, exist_ok=True)
+    # Pass the PID path to the child via environment variable so the
+    # watch-live process writes its own PID and removes it on exit.
+    # This prevents stale PID files when the watcher is killed or crashes.
+    env = os.environ.copy()
+    env["TC_WATCH_PID_PATH"] = str(PID_PATH)
     with LOG_PATH.open("ab", buffering=0) as log:
-        process = subprocess.Popen(
+        subprocess.Popen(
             COMMAND,
             stdout=log,
             stderr=subprocess.STDOUT,
             start_new_session=True,
+            env=env,
         )
-    PID_PATH.write_text(str(process.pid) + "\\n")
 
 
 if __name__ == "__main__":

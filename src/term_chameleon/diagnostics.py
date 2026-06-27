@@ -30,6 +30,34 @@ def diagnose(profile: ItermProfile) -> list[Diagnostic]:
     bg = profile.color("Background Color")
     fg = profile.color("Foreground Color")
 
+    # Detect present-but-unparseable color dicts before running contrast checks.
+    # A malformed color makes color() return None, silently skipping all contrast
+    # diagnostics; we surface it explicitly here instead.
+    _MALFORMED_COLOR_KEYS: list[tuple[str, str]] = [
+        ("Background Color", "MALFORMED_BACKGROUND_COLOR"),
+        ("Foreground Color", "MALFORMED_FOREGROUND_COLOR"),
+        ("Bold Color", "MALFORMED_BOLD_COLOR"),
+        ("Cursor Color", "MALFORMED_CURSOR_COLOR"),
+        ("Selection Color", "MALFORMED_SELECTION_COLOR"),
+        ("Selected Text Color", "MALFORMED_SELECTED_TEXT_COLOR"),
+        ("Ansi 0 Color", "MALFORMED_ANSI_0_COLOR"),
+        ("Ansi 7 Color", "MALFORMED_ANSI_7_COLOR"),
+        ("Ansi 8 Color", "MALFORMED_ANSI_8_COLOR"),
+        ("Ansi 15 Color", "MALFORMED_ANSI_15_COLOR"),
+    ]
+    for color_key, code in _MALFORMED_COLOR_KEYS:
+        if profile.is_color_malformed(color_key):
+            diagnostics.append(
+                Diagnostic(
+                    FAIL,
+                    code,
+                    f"{color_key!r} is present but could not be parsed",
+                    f"The value for {color_key!r} is a dict but contains a non-numeric or "
+                    "otherwise invalid component. Contrast checks for this color are skipped.",
+                    "Re-export the profile from iTerm2 or correct the component values manually.",
+                )
+            )
+
     if not profile.guid:
         diagnostics.append(
             Diagnostic(

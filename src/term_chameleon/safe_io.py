@@ -7,6 +7,10 @@ from contextlib import suppress
 from datetime import datetime
 from pathlib import Path
 
+# Maximum number of timestamped backups kept alongside each source file.
+# Older backups beyond this limit are pruned (best-effort) after a new backup is created.
+MAX_BACKUPS: int = 5
+
 
 def unique_backup_path(path: str | Path) -> Path:
     source = Path(path)
@@ -19,11 +23,24 @@ def unique_backup_path(path: str | Path) -> Path:
     return candidate
 
 
-def backup_file(path: str | Path) -> Path:
+def _prune_backups(source: Path, keep: int = MAX_BACKUPS) -> None:
+    """Remove the oldest `<name>.backup.*` files, keeping the *keep* most recent."""
+    existing = sorted(
+        source.parent.glob(f"{source.name}.backup.*"),
+        key=lambda p: p.stat().st_mtime,
+    )
+    for old in existing[:-keep] if keep > 0 else existing:
+        with suppress(OSError):
+            old.unlink()
+
+
+def backup_file(path: str | Path, keep: int = MAX_BACKUPS) -> Path:
+    """Copy *path* to a timestamped backup and prune older backups beyond *keep*."""
     source = Path(path)
     backup = unique_backup_path(source)
     if source.exists():
         shutil.copy2(source, backup)
+    _prune_backups(source, keep=keep)
     return backup
 
 

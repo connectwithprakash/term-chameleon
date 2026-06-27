@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from term_chameleon.diagnostics import diagnose
 from term_chameleon.iterm_profile import loads_document
 
 FIXTURES = Path(__file__).parent / "fixtures" / "iterm"
@@ -122,3 +123,142 @@ def test_write_writes_correct_content(tmp_path):
     assert target.exists()
     data = json.loads(target.read_text(encoding="utf-8"))
     assert data["Profiles"][0]["Name"] == "Test Profile"
+
+
+# ---------------------------------------------------------------------------
+# is_color_malformed — distinguishes absent vs present-but-unparseable
+# ---------------------------------------------------------------------------
+
+
+def test_is_color_malformed_absent_key_returns_false():
+    """Key not present in profile -> is_color_malformed returns False."""
+    profile = loads_document(MINIMAL_PROFILE_JSON)
+    assert profile.is_color_malformed("Foreground Color") is False
+
+
+def test_is_color_malformed_valid_dict_returns_false():
+    """Well-formed color dict -> is_color_malformed returns False."""
+    profile = loads_document(MINIMAL_PROFILE_JSON)
+    assert profile.is_color_malformed("Background Color") is False
+
+
+def test_is_color_malformed_string_component_returns_true():
+    """Color dict with a string component -> is_color_malformed returns True."""
+    profile_json = json.dumps(
+        {
+            "Profiles": [
+                {
+                    "Name": "Test",
+                    "Guid": "g1",
+                    "Background Color": {
+                        "Red Component": "oops",
+                        "Green Component": 0.0,
+                        "Blue Component": 0.0,
+                        "Alpha Component": 1.0,
+                    },
+                }
+            ]
+        }
+    )
+    profile = loads_document(profile_json)
+    assert profile.is_color_malformed("Background Color") is True
+
+
+def test_is_color_malformed_non_dict_value_returns_false():
+    """Non-dict value for a color key -> is_color_malformed returns False (not a color dict)."""
+    profile_json = json.dumps(
+        {"Profiles": [{"Name": "Test", "Guid": "g1", "Background Color": "not-a-dict"}]}
+    )
+    profile = loads_document(profile_json)
+    assert profile.is_color_malformed("Background Color") is False
+
+
+# ---------------------------------------------------------------------------
+# diagnose() — MALFORMED_*_COLOR diagnostics
+# ---------------------------------------------------------------------------
+
+
+def _make_malformed_bg_profile() -> str:
+    """Profile with Background Color present but containing a non-numeric component."""
+    return json.dumps(
+        {
+            "Profiles": [
+                {
+                    "Name": "Malformed",
+                    "Guid": "guid-malformed",
+                    "Background Color": {
+                        "Red Component": "oops",
+                        "Green Component": 0.0,
+                        "Blue Component": 0.0,
+                        "Alpha Component": 1.0,
+                    },
+                    "Foreground Color": {
+                        "Red Component": 0.0,
+                        "Green Component": 0.0,
+                        "Blue Component": 0.0,
+                        "Alpha Component": 1.0,
+                    },
+                }
+            ]
+        }
+    )
+
+
+def test_diagnose_emits_malformed_background_color():
+    """diagnose() must emit MALFORMED_BACKGROUND_COLOR when bg is present but unparseable."""
+    profile = loads_document(_make_malformed_bg_profile())
+    codes = {d.code for d in diagnose(profile)}
+    assert "MALFORMED_BACKGROUND_COLOR" in codes
+
+
+def test_diagnose_malformed_bg_diagnostic_is_fail_severity():
+    """MALFORMED_BACKGROUND_COLOR diagnostic must have severity='fail'."""
+    profile = loads_document(_make_malformed_bg_profile())
+    diags = {d.code: d for d in diagnose(profile)}
+    assert diags["MALFORMED_BACKGROUND_COLOR"].severity == "fail"
+
+
+def test_diagnose_absent_bg_does_not_emit_malformed():
+    """A profile with no Background Color key must not emit a MALFORMED_BACKGROUND_COLOR."""
+    profile_json = json.dumps(
+        {
+            "Profiles": [
+                {
+                    "Name": "NoBg",
+                    "Guid": "guid-nobg",
+                }
+            ]
+        }
+    )
+    profile = loads_document(profile_json)
+    codes = {d.code for d in diagnose(profile)}
+    assert "MALFORMED_BACKGROUND_COLOR" not in codes
+
+
+def test_diagnose_malformed_fg_emits_malformed_foreground_color():
+    """diagnose() must emit MALFORMED_FOREGROUND_COLOR for a corrupt Foreground Color."""
+    profile_json = json.dumps(
+        {
+            "Profiles": [
+                {
+                    "Name": "MalformedFg",
+                    "Guid": "guid-fg",
+                    "Background Color": {
+                        "Red Component": 0.0,
+                        "Green Component": 0.0,
+                        "Blue Component": 0.0,
+                        "Alpha Component": 1.0,
+                    },
+                    "Foreground Color": {
+                        "Red Component": {"nested": 1},
+                        "Green Component": 0.0,
+                        "Blue Component": 0.0,
+                        "Alpha Component": 1.0,
+                    },
+                }
+            ]
+        }
+    )
+    profile = loads_document(profile_json)
+    codes = {d.code for d in diagnose(profile)}
+    assert "MALFORMED_FOREGROUND_COLOR" in codes

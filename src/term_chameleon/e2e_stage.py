@@ -20,6 +20,15 @@ class E2EStageReport:
     screenshot_report_json: str
     screenshot_report_md: str
     screenshot_captured: bool | None
+    visual_checks_passed: bool = True
+    visual_checks_failed: int = 0
+
+    @property
+    def passed(self) -> bool:
+        """Return True when visual checks passed and any requested capture succeeded."""
+        return self.visual_checks_passed and (
+            self.screenshot_captured is not False
+        )
 
 
 def run_e2e_stage(
@@ -35,7 +44,7 @@ def run_e2e_stage(
 
     backgrounds = write_background_html(out / "background-html")
     pattern, script = write_pattern_bundle(out / "pattern")
-    visual_json, visual_md, _checks = write_visual_report(profile_path, out / "visual-test")
+    visual_json, visual_md, checks = write_visual_report(profile_path, out / "visual-test")
     screenshot_report = run_screenshot_test(
         out / "screenshot-test",
         capture=capture,
@@ -43,6 +52,12 @@ def run_e2e_stage(
         height=height,
     )
 
+    failed_checks = [c for c in checks if not c.passed]
+    screenshot_captured: bool | None = (
+        screenshot_report.screenshot.captured
+        if screenshot_report.screenshot is not None
+        else None
+    )
     report = E2EStageReport(
         output_dir=out,
         background_files=[str(artifact.path) for artifact in backgrounds],
@@ -51,9 +66,9 @@ def run_e2e_stage(
         visual_report_md=str(visual_md),
         screenshot_report_json=str(screenshot_report.output_dir / "report.json"),
         screenshot_report_md=str(screenshot_report.output_dir / "report.md"),
-        screenshot_captured=screenshot_report.screenshot.captured
-        if screenshot_report.screenshot is not None
-        else None,
+        screenshot_captured=screenshot_captured,
+        visual_checks_passed=len(failed_checks) == 0,
+        visual_checks_failed=len(failed_checks),
     )
     write_e2e_report(report)
     return report
@@ -77,6 +92,8 @@ def write_e2e_report(report: E2EStageReport) -> tuple[Path, Path]:
         f"- visual report: `{visual_rel}`",
         f"- screenshot report: `{screenshot_rel}`",
         f"- screenshot captured: `{report.screenshot_captured}`",
+        f"- visual checks passed: `{report.visual_checks_passed}` "
+        f"({report.visual_checks_failed} failed)",
         "",
         "## Live GUI stage",
         "",

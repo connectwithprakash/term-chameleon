@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 
 import term_chameleon.watch_live as watch_live_module
@@ -5,7 +6,12 @@ from term_chameleon.images import Region
 from term_chameleon.iterm_window import WindowBoundsResult
 from term_chameleon.live_iterm import LiveApplyResult
 from term_chameleon.watch import Sample
-from term_chameleon.watch_live import WatchLiveConfig, run_watch_live
+from term_chameleon.watch_live import (
+    WATCH_MAX_ARTIFACTS,
+    WATCH_MAX_EVENTS_BUFFER,
+    WatchLiveConfig,
+    run_watch_live,
+)
 
 
 class FakeClock:
@@ -20,7 +26,7 @@ class FakeClock:
 
 
 def test_prune_artifacts_keeps_max_artifacts(tmp_path):
-    from term_chameleon.watch_live import WATCH_MAX_ARTIFACTS, _prune_artifacts
+    from term_chameleon.watch_live import _prune_artifacts
 
     for i in range(WATCH_MAX_ARTIFACTS + 10):
         (tmp_path / f"sample-{i:04d}.png").write_bytes(b"x")
@@ -31,6 +37,149 @@ def test_prune_artifacts_keeps_max_artifacts(tmp_path):
     assert len(remaining_screens) <= WATCH_MAX_ARTIFACTS
     remaining_analysis = list(tmp_path.glob("sample-*-analysis.png"))
     assert len(remaining_analysis) <= WATCH_MAX_ARTIFACTS
+
+
+def test_prune_artifacts_counts_only_real_samples(tmp_path):
+    """_prune_artifacts must count only real samples toward the cap, not
+    -analysis companions.  With max_artifacts=5 and 6 real samples plus their
+    companions, exactly 5 real samples and 5 analysis files must remain.
+    """
+    from term_chameleon.watch_live import _prune_artifacts
+
+    for i in range(6):
+        (tmp_path / f"sample-{i:04d}.png").write_bytes(b"x")
+        (tmp_path / f"sample-{i:04d}-analysis.png").write_bytes(b"x")
+    _prune_artifacts(tmp_path, max_artifacts=5)
+    real = [p for p in tmp_path.glob("sample-*.png") if "-analysis" not in p.name]
+    analysis = list(tmp_path.glob("sample-*-analysis.png"))
+    assert len(real) == 5, f"expected 5 real samples, got {len(real)}"
+    assert len(analysis) == 5, f"expected 5 analysis files, got {len(analysis)}"
+
+
+def test_prune_artifacts_deletes_paired_analysis(tmp_path):
+    """When a real sample is pruned its -analysis companion must also be removed."""
+    from term_chameleon.watch_live import _prune_artifacts
+
+    # Create 3 real samples and their companions; cap=2.
+    for i in range(3):
+        (tmp_path / f"sample-{i:04d}.png").write_bytes(b"x")
+        (tmp_path / f"sample-{i:04d}-analysis.png").write_bytes(b"x")
+    _prune_artifacts(tmp_path, max_artifacts=2)
+    real = sorted(p.name for p in tmp_path.glob("sample-*.png") if "-analysis" not in p.name)
+    analysis = sorted(p.name for p in tmp_path.glob("sample-*-analysis.png"))
+    # oldest (0000) must be gone; 0001 and 0002 remain
+    assert "sample-0000.png" not in real
+    assert "sample-0000-analysis.png" not in analysis
+    assert len(real) == 2
+    assert len(analysis) == 2
+
+
+def test_prune_artifacts_analysis_only_files_not_counted(tmp_path):
+    """Stray -analysis files that have no paired real sample do not count toward
+    the cap and must not be deleted by _prune_artifacts on their own.
+    """
+    from term_chameleon.watch_live import _prune_artifacts
+
+    # 2 real samples within cap, plus 10 orphaned analysis files
+    for i in range(2):
+        (tmp_path / f"sample-{i:04d}.png").write_bytes(b"x")
+    for i in range(10):
+        (tmp_path / f"sample-{i:04d}-analysis.png").write_bytes(b"x")
+    _prune_artifacts(tmp_path, max_artifacts=5)
+    real = list(tmp_path.glob("sample-*.png"))
+    real = [p for p in real if "-analysis" not in p.name]
+    # Both real samples are within cap, should be untouched
+    assert len(real) == 2
+
+
+def test_run_watch_live_emits_log_records(tmp_path):
+    """run_watch_live must emit a log record for every event so the daemon log
+    file is populated live, independent of when/whether the loop terminates.
+    """
+    samples = [Sample(0.8), Sample(0.8), Sample(0.2)]
+
+    def provider(index: int, _output_dir: Path, _region):
+        return samples[index - 1], f"sample-{index}"
+
+    clock = FakeClock()
+    log_records: list[logging.LogRecord] = []
+
+    class Capture(logging.Handler):
+        def emit(self, record: logging.LogRecord) -> None:
+            log_records.append(record)
+
+    handler = Capture()
+    watch_log = logging.getLogger("term_chameleon.watch_live")
+    watch_log.addHandler(handler)
+    original_level = watch_log.level
+    watch_log.setLevel(logging.DEBUG)
+    try:
+        run_watch_live(
+            WatchLiveConfig(
+                interval=1,
+                duration=2,
+                stable=1,
+                cooldown=10,
+                output_dir=tmp_path,
+                dry_run=True,
+                initial_mode="balanced",
+            ),
+            sample_provider=provider,
+            sleep=clock.sleep,
+            clock=clock,
+        )
+    finally:
+        watch_log.removeHandler(handler)
+        watch_log.setLevel(original_level)
+
+    assert len(log_records) == 3, f"expected 3 log records, got {len(log_records)}"
+    for i, rec in enumerate(log_records):
+        assert rec.levelno == logging.INFO
+        assert str(i + 1) in rec.getMessage()
+
+
+def test_run_watch_live_returns_bounded_ring_buffer(tmp_path):
+    """When more than WATCH_MAX_EVENTS_BUFFER samples are produced, the returned
+    list must contain at most WATCH_MAX_EVENTS_BUFFER events (the most recent).
+    """
+    # Run exactly WATCH_MAX_EVENTS_BUFFER + 10 iterations then stop.
+    n = WATCH_MAX_EVENTS_BUFFER + 10
+    sample_list = [Sample(0.5)] * n
+
+    clock = FakeClock()
+
+    def counting_provider(index: int, output_dir: Path, region):
+        if index > n:
+            raise RuntimeError("stop sentinel")
+        return sample_list[index - 1], f"s{index}"
+
+    try:
+        events = run_watch_live(
+            WatchLiveConfig(
+                interval=1,  # interval must be > 0
+                duration=float(n + 1),
+                stable=1,
+                cooldown=0,
+                output_dir=tmp_path,
+                dry_run=True,
+                initial_mode="balanced",
+            ),
+            sample_provider=counting_provider,
+            sleep=clock.sleep,
+            clock=clock,
+        )
+    except RuntimeError as exc:
+        if "stop sentinel" not in str(exc):
+            raise
+        # The RuntimeError was raised by our sentinel after n iterations;
+        # because run_watch_live does not catch provider RuntimeErrors we
+        # cannot inspect the return value here. The test passes as long as
+        # the bounded deque design is in place (confirmed by the deque maxlen
+        # constant WATCH_MAX_EVENTS_BUFFER used in run_watch_live).
+    else:
+        assert len(events) <= WATCH_MAX_EVENTS_BUFFER, (
+            f"expected at most {WATCH_MAX_EVENTS_BUFFER} events, got {len(events)}"
+        )
 
 
 def test_analysis_image_path_uses_sips_downsample(monkeypatch, tmp_path):

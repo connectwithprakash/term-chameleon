@@ -97,7 +97,7 @@ def _otsu_threshold(values: list[float]) -> float:
         var_between = w0 * w1 * (mean0 - mean1) ** 2
         if var_between > best_var:
             best_var = var_between
-            best_t = t_i
+            best_t = (mean0 + mean1) / 2
     return best_t
 
 
@@ -187,27 +187,59 @@ def estimate_raster_text_contrast(
     if adaptive and all_band_luminances:
         adaptive_t = _otsu_threshold(all_band_luminances)
 
-        def split_fn(lum: float) -> bool:
-            return abs(lum - adaptive_t) >= glyph_delta
+        # Split band pixels into dark and light clusters using the inter-class boundary,
+        # with a glyph_delta margin that excludes uncertain transition pixels.
+        # The minority cluster is the glyph (text); the majority is background.
+        # Ties default to dark-as-glyph (dark text on light background).
+        dark_count = sum(
+            1
+            for bp in band_pixel_lists
+            for pixel in bp
+            if pixel.relative_luminance() < adaptive_t - glyph_delta
+        )
+        light_count = sum(
+            1
+            for bp in band_pixel_lists
+            for pixel in bp
+            if pixel.relative_luminance() > adaptive_t + glyph_delta
+        )
+        if dark_count <= light_count:
+            is_glyph: object = lambda lum: lum < adaptive_t - glyph_delta  # noqa: E731
+        else:
+            is_glyph = lambda lum: lum > adaptive_t + glyph_delta  # noqa: E731
+
+        glyph_pixels: list[Color] = []
+        background_pixels: list[Color] = []
+        bands_with_counts: list[TextRowBand] = []
+        for band, bp in zip(bands, band_pixel_lists, strict=True):
+            glyph_count = 0
+            for pixel in bp:
+                lum = pixel.relative_luminance()
+                if is_glyph(lum):
+                    glyph_pixels.append(pixel)
+                    glyph_count += 1
+                else:
+                    background_pixels.append(pixel)
+            bands_with_counts.append(TextRowBand(band.y, band.height, band.score, glyph_count))
     else:
         bg_median = median(all_band_luminances) if all_band_luminances else 0.5
 
         def split_fn(lum: float) -> bool:
             return abs(lum - bg_median) >= glyph_delta
 
-    glyph_pixels: list[Color] = []
-    background_pixels: list[Color] = []
-    bands_with_counts: list[TextRowBand] = []
-    for band, bp in zip(bands, band_pixel_lists, strict=True):
-        luminances = [pixel.relative_luminance() for pixel in bp]
-        glyph_count = 0
-        for pixel, lum in zip(bp, luminances, strict=True):
-            if split_fn(lum):
-                glyph_pixels.append(pixel)
-                glyph_count += 1
-            else:
-                background_pixels.append(pixel)
-        bands_with_counts.append(TextRowBand(band.y, band.height, band.score, glyph_count))
+        glyph_pixels = []
+        background_pixels = []
+        bands_with_counts = []
+        for band, bp in zip(bands, band_pixel_lists, strict=True):
+            luminances = [pixel.relative_luminance() for pixel in bp]
+            glyph_count = 0
+            for pixel, lum in zip(bp, luminances, strict=True):
+                if split_fn(lum):
+                    glyph_pixels.append(pixel)
+                    glyph_count += 1
+                else:
+                    background_pixels.append(pixel)
+            bands_with_counts.append(TextRowBand(band.y, band.height, band.score, glyph_count))
 
     if not glyph_pixels:
         raise TextContrastUnavailable(

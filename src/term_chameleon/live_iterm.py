@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .iterm_api import setter_mappings
+from .iterm_connection import DEFAULT_APPLY_TIMEOUT, run_iterm_bounded
 from .presets import get_preset
 
 
@@ -14,11 +15,22 @@ class LiveApplyResult:
     message: str
 
 
-def apply_preset_to_current_session(preset_name: str) -> LiveApplyResult:
+def apply_preset_to_current_session(
+    preset_name: str,
+    *,
+    timeout: float = DEFAULT_APPLY_TIMEOUT,
+) -> LiveApplyResult:
     """Apply a preset to the current iTerm2 session-local profile.
 
     This mutates only the current session's LocalWriteOnlyProfile. It does not
     rewrite Dynamic Profile JSON or global iTerm2 preferences.
+
+    Runs the iterm2 websocket call on a daemon thread bounded by *timeout*
+    seconds so a hung or unresponsive iTerm2 daemon never blocks the
+    long-running watch loop.  Raises ``RuntimeError`` on timeout (the watch
+    loop already catches RuntimeError and continues).  Also closes the asyncio
+    event loop created by iterm2 after each call to prevent fd leaks in the
+    multi-year watch daemon.
     """
     try:
         import iterm2  # type: ignore[import-not-found]
@@ -58,10 +70,12 @@ def apply_preset_to_current_session(preset_name: str) -> LiveApplyResult:
             maybe_set(change, setter_name, value)
         await session.async_set_profile_properties(change)
 
+    # run_iterm_bounded drives iterm2.run_until_complete on a daemon thread
+    # bounded by *timeout* and closes the event loop afterward (fd reclamation).
     try:
-        iterm2.run_until_complete(main)
-    except SystemExit as exc:
-        raise RuntimeError(f"iTerm2 connection exited with status {exc.code}") from exc
+        run_iterm_bounded(main, timeout=timeout)
+    except RuntimeError:
+        raise
     except Exception as exc:
         raise RuntimeError(f"iTerm2 live apply failed: {exc}") from exc
 

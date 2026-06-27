@@ -224,6 +224,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     release_check.add_argument("--threshold", type=float, default=4.5)
     release_check.add_argument("--settle-delay", type=float, default=0.2)
+    release_check.add_argument(
+        "--yes",
+        action="store_true",
+        help="Confirm driving GUI apps when --live-stage is set",
+    )
 
     status = sub.add_parser(
         "status",
@@ -243,7 +248,12 @@ def main(argv: list[str] | None = None) -> int:
     setup.add_argument("--preset", choices=sorted(PRESETS), default=None)
     setup.add_argument("--name", default=None)
     setup.add_argument("--yes", action="store_true", help="Install the generated profile if needed")
-    setup.add_argument("--live", action="store_true", help="Probe live iTerm2 API/window bounds")
+    setup.add_argument(
+        "--live",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Probe live iTerm2 API/window bounds (--no-live disables config live=true)",
+    )
 
     config_example = sub.add_parser("config-example", help="Print an example TOML config")
     config_example.add_argument("--output", type=Path, help="Write config example to a file")
@@ -470,6 +480,7 @@ def main(argv: list[str] | None = None) -> int:
                 live_stage=args.live_stage,
                 threshold=args.threshold,
                 settle_delay=args.settle_delay,
+                yes=args.yes,
             )
         if args.command == "status":
             return _status(profile=args.profile, live=args.live, json_output=args.json)
@@ -796,7 +807,8 @@ def _watch_daemon_status(
         pid_path=resolved_pid,
     )
     if json_output:
-        print(json.dumps(asdict(status), indent=2, default=str))
+        payload = {**asdict(status), "healthy": status.healthy}
+        print(json.dumps(payload, indent=2, default=str))
     else:
         print(f"AutoLaunch script: {status.target}")
         print(f"Installed: {'yes' if status.installed else 'no'}")
@@ -943,7 +955,13 @@ def _release_check(
     live_stage: bool,
     threshold: float,
     settle_delay: float,
+    yes: bool = False,
 ) -> int:
+    if live_stage and not yes:
+        print(
+            "Refusing to drive GUI apps without --yes. Use --dry-run to preview.", file=sys.stderr
+        )
+        return 2
     report = run_release_check(
         output_dir=output_dir,
         config_path=config,
@@ -996,17 +1014,19 @@ def _setup(
     preset: str | None,
     name: str | None,
     yes: bool,
-    live: bool,
+    live: bool | None,
     config: Path | None,
 ) -> int:
     cfg = load_config(config)
     setup_cfg = merged_section(cfg, "setup")
     output = output_dir or path_value(value(setup_cfg, "output_dir"), Path("artifacts/setup"))
     config_live = bool_value(value(setup_cfg, "live"), False)
+    # Explicit CLI flag (True or False) overrides config; None means unspecified -> use config.
+    resolved_live = config_live if live is None else live
     report = run_setup(
         output_dir=output,
         yes=yes,
-        live=live or config_live,
+        live=resolved_live,
         profile_path=profile or path_value(value(setup_cfg, "profile")),
         preset=preset or str_value(value(setup_cfg, "preset"), "balanced"),
         name=name or str_value(value(setup_cfg, "name"), "Adaptive Glass Alpha"),
@@ -1316,6 +1336,18 @@ def _e2e_stage(*, profile: Path, output_dir: Path, capture: bool, width: int, he
     print(f"Visual report: {report.visual_report_json}")
     print(f"Screenshot report: {report.screenshot_report_json}")
     print(f"Screenshot captured: {report.screenshot_captured}")
+    visual_status = (
+        "passed"
+        if report.visual_checks_passed
+        else f"FAILED ({report.visual_checks_failed} failed)"
+    )
+    print(f"Visual checks: {visual_status}")
+    if not report.visual_checks_passed:
+        print("[fail] e2e stage visual checks failed", file=sys.stderr)
+        return 1
+    if capture and report.screenshot_captured is False:
+        print("[fail] e2e stage screenshot capture failed", file=sys.stderr)
+        return 1
     print("[ok] e2e staging bundle passed")
     return 0
 

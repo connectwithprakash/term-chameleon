@@ -55,6 +55,40 @@ def test_write_contrast_report(tmp_path):
     assert estimate.passed is True
 
 
+def test_estimate_raster_contrast_percentile_half_odd_pixels_no_overlap():
+    """Regression: percentile=0.5 on an odd-pixel-count image must not double-count.
+
+    When len(pixels) is odd and percentile=0.5, round() rounds sample_size up,
+    which would cause the dark and light slices to overlap at the middle index,
+    biasing both cluster means toward the median and understating contrast.
+    The cap `min(..., len(pixels) // 2)` must prevent this.
+    """
+    # 3 pixels sorted by luminance: black, mid-gray, white.
+    # With the bug: sample_size=round(1.5)=2; dark=[:2], light=[-2:] share index 1.
+    # With the fix: sample_size=max(1, min(2, 1))=1; dark=[:1]=[black], light=[-1:]=[white].
+    image = RasterImage(
+        3,
+        1,
+        (
+            Color.from_hex("#000000"),
+            Color.from_hex("#808080"),
+            Color.from_hex("#FFFFFF"),
+        ),
+    )
+    estimate = estimate_raster_contrast(image, percentile=0.5)
+
+    # Clusters must be disjoint: dark=[black], light=[white] => true max contrast.
+    assert estimate.dark_color == "#000000", (
+        f"dark_color={estimate.dark_color!r}, expected #000000 (pure black)"
+    )
+    assert estimate.light_color == "#FFFFFF", (
+        f"light_color={estimate.light_color!r}, expected #FFFFFF (pure white)"
+    )
+    assert estimate.contrast == 21.0, (
+        f"contrast={estimate.contrast}, expected 21.0 (full black-white range)"
+    )
+
+
 def test_screenshot_contrast_cli(tmp_path, capsys):
     path = write_ppm(
         tmp_path / "mixed.ppm",
