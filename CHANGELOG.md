@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.0 - 2026-06-27
+
+### Stable release
+
+- Promoted from beta to stable after sustained daemon dogfood (35+ hours at 0% CPU, bounded disk, no crashes).
+- Removed dead code (`query_dynamic_color`, `supported_color_fields`).
+- Replaced runtime `assert` with explicit `ConfigError` raises for daemon path resolution and region validation.
+- Added `__all__` to package `__init__`.
+- Added `help=` text to all key CLI arguments.
+- Added README Troubleshooting section.
+- Promoted classifier to `Development Status :: 5 - Production/Stable`.
+
 ## 0.1.0b4 - 2026-06-27
 
 ### Fixed

@@ -320,7 +320,9 @@ def _validate_region(section_name: str, data: Config, key: str, errors: list[str
     except ConfigError as exc:
         errors.append(f"[{section_name}].{key}: {exc}")
         return
-    assert parsed is not None
+    if parsed is None:
+        errors.append(f"[{section_name}].{key}: expected string")
+        return
     parts = parsed.split(",")
     if len(parts) != 4:
         errors.append(f"[{section_name}].{key}: expected x,y,width,height")

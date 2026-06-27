@@ -100,17 +100,30 @@ def main(argv: list[str] | None = None) -> int:
         help="Install an iTerm2 AutoLaunch script that starts watch-live",
     )
     install_watch.add_argument("--config", type=Path, help="TOML config file")
-    install_watch.add_argument("--autolaunch-dir", type=Path, default=None)
-    install_watch.add_argument("--python", dest="python_executable", default=None)
-    install_watch.add_argument("--interval", type=float, default=None)
-    install_watch.add_argument("--stable", type=int, default=None)
-    install_watch.add_argument("--cooldown", type=float, default=None)
+    install_watch.add_argument(
+        "--autolaunch-dir", type=Path, default=None, help="iTerm2 AutoLaunch scripts directory"
+    )
+    install_watch.add_argument(
+        "--python", dest="python_executable", default=None, help="Python executable for the daemon"
+    )
+    install_watch.add_argument(
+        "--interval", type=float, default=None, help="Seconds between samples"
+    )
+    install_watch.add_argument(
+        "--stable", type=int, default=None, help="Consecutive samples required before switching"
+    )
+    install_watch.add_argument(
+        "--cooldown", type=float, default=None, help="Minimum seconds between mode switches"
+    )
     install_watch.add_argument(
         "--output-dir",
         type=Path,
         default=None,
+        help="Directory for watcher screenshot artifacts",
     )
-    install_watch.add_argument("--initial-mode", choices=sorted(PRESETS), default=None)
+    install_watch.add_argument(
+        "--initial-mode", choices=sorted(PRESETS), default=None, help="Starting readability mode"
+    )
     daemon_region = install_watch.add_mutually_exclusive_group()
     daemon_region.add_argument("--region", help="Screen region as x,y,width,height")
     daemon_region.add_argument(
@@ -123,34 +136,46 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Sample the whole screen instead of the iTerm window",
     )
-    install_watch.add_argument("--log-path", type=Path, default=None)
-    install_watch.add_argument("--pid-path", type=Path, default=None)
-    install_watch.add_argument("--dry-run", action="store_true")
+    install_watch.add_argument("--log-path", type=Path, default=None, help="Daemon log file path")
+    install_watch.add_argument("--pid-path", type=Path, default=None, help="Daemon PID file path")
+    install_watch.add_argument("--dry-run", action="store_true", help="Preview without installing")
 
     watch_daemon_status = sub.add_parser(
         "watch-daemon-status",
         help="Inspect the iTerm2 AutoLaunch watch daemon script, log, and pid",
     )
     watch_daemon_status.add_argument("--config", type=Path, help="TOML config file")
-    watch_daemon_status.add_argument("--autolaunch-dir", type=Path, default=None)
-    watch_daemon_status.add_argument("--log-path", type=Path, default=None)
-    watch_daemon_status.add_argument("--pid-path", type=Path, default=None)
-    watch_daemon_status.add_argument("--json", action="store_true")
+    watch_daemon_status.add_argument(
+        "--autolaunch-dir", type=Path, default=None, help="iTerm2 AutoLaunch scripts directory"
+    )
+    watch_daemon_status.add_argument(
+        "--log-path", type=Path, default=None, help="Daemon log file path"
+    )
+    watch_daemon_status.add_argument(
+        "--pid-path", type=Path, default=None, help="Daemon PID file path"
+    )
+    watch_daemon_status.add_argument(
+        "--json", action="store_true", help="Emit machine-readable JSON"
+    )
 
     uninstall_watch = sub.add_parser(
         "uninstall-watch-daemon",
         help="Remove the Term Chameleon iTerm2 AutoLaunch watch daemon script",
     )
     uninstall_watch.add_argument("--config", type=Path, help="TOML config file")
-    uninstall_watch.add_argument("--autolaunch-dir", type=Path, default=None)
-    uninstall_watch.add_argument("--dry-run", action="store_true")
-    uninstall_watch.add_argument("--no-backup", action="store_true")
+    uninstall_watch.add_argument(
+        "--autolaunch-dir", type=Path, default=None, help="iTerm2 AutoLaunch scripts directory"
+    )
+    uninstall_watch.add_argument("--dry-run", action="store_true", help="Preview without removing")
+    uninstall_watch.add_argument(
+        "--no-backup", action="store_true", help="Do not back up the script before removing"
+    )
 
     mode = sub.add_parser("mode", help="Apply a readability mode/preset to a profile JSON file")
     mode.add_argument("preset", choices=sorted(PRESETS))
-    mode.add_argument("profile", type=Path)
-    mode.add_argument("--dry-run", action="store_true")
-    mode.add_argument("--yes", action="store_true")
+    mode.add_argument("profile", type=Path, help="Dynamic Profile JSON file")
+    mode.add_argument("--dry-run", action="store_true", help="Preview without writing")
+    mode.add_argument("--yes", action="store_true", help="Confirm writing to the profile file")
 
     osc = sub.add_parser("osc", help="Print OSC color sequences for a preset")
     osc.add_argument("action", choices=["apply", "reset"])
@@ -728,9 +753,12 @@ def _daemon_paths_from_config(
     )
     resolved_log = log_path or path_value(value(daemon_cfg, "log_path"), DEFAULT_LOG_PATH)
     resolved_pid = pid_path or path_value(value(daemon_cfg, "pid_path"), DEFAULT_PID_PATH)
-    assert resolved_autolaunch is not None
-    assert resolved_log is not None
-    assert resolved_pid is not None
+    if resolved_autolaunch is None:
+        raise ConfigError("autolaunch_dir must be a path string")
+    if resolved_log is None:
+        raise ConfigError("log_path must be a path string")
+    if resolved_pid is None:
+        raise ConfigError("pid_path must be a path string")
     return (resolved_autolaunch, resolved_log, resolved_pid)
 
 

@@ -142,4 +142,7 @@ Implemented/verified:
 - Reduced daemon CPU usage by downsampling screenshots before luminance/variance analysis and setting the AutoLaunch default interval to 10 seconds.
 
 - Observed watcher screenshot sample artifacts over a sustained run.
-- Promoted release metadata to `0.1.0b3` / `v0.1.0-beta.3`.
+- Promoted release metadata to `0.1.0b4` / `v0.1.0-beta.4` (artifact rotation, iterm-window validation fix).
+- Sustained daemon dogfood verified: 35+ hours at 0% CPU, bounded disk (200-artifact rotation), no crashes.
+- Removed dead code, replaced runtime asserts with explicit errors, added `__all__`, CLI help text, README Troubleshooting.
+- Promoted release metadata to `0.1.0` / `v0.1.0` stable.

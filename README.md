@@ -6,7 +6,7 @@ Glassy terminal themes look good until white text disappears over a bright windo
 
 ## Current status
 
-This repository is prepared as `v0.1.0-beta.4` / Python package version `0.1.0b4`: a dogfooded beta for static profile diagnostics, safe profile mutation, deterministic visual artifacts, live iTerm2 adaptation, controlled macOS GUI/screenshot QA, and real iTerm2 AutoLaunch watcher operation. Implemented:
+This repository is prepared as `v0.1.0` / Python package version `0.1.0`: a dogfooded beta for static profile diagnostics, safe profile mutation, deterministic visual artifacts, live iTerm2 adaptation, controlled macOS GUI/screenshot QA, and real iTerm2 AutoLaunch watcher operation. Implemented:
 
 - iTerm2 Dynamic Profile JSON parsing.
 - Color conversion between hex and iTerm2 color dictionaries.
@@ -46,7 +46,7 @@ Build and install the beta wheel locally:
 ```bash
 uv build
 python3 -m venv /tmp/term-chameleon-beta-venv
-/tmp/term-chameleon-beta-venv/bin/pip install 'dist/term_chameleon-0.1.0b4-py3-none-any.whl[iterm]'
+/tmp/term-chameleon-beta-venv/bin/pip install 'dist/term_chameleon-0.1.0-py3-none-any.whl[iterm]'
 /tmp/term-chameleon-beta-venv/bin/term-chameleon setup --yes
 /tmp/term-chameleon-beta-venv/bin/term-chameleon release-check --output-dir /tmp/term-chameleon-beta-release-check
 /tmp/term-chameleon-beta-venv/bin/term-chameleon release-check --output-dir /tmp/term-chameleon-beta-live-check --live --live-stage --threshold 1.0
@@ -189,6 +189,46 @@ cp tests/fixtures/iterm/bad-light-variant.json /tmp/profile.json
 term-chameleon fix /tmp/profile.json --yes
 term-chameleon doctor /tmp/profile.json
 ```
+
+## Troubleshooting
+
+**iTerm2 Python API not connected:**
+
+Ensure iTerm2 is running and Python API support is enabled: iTerm2 → Settings → General → Magic → check "Enable Python API". Run `term-chameleon iterm-api-check` to verify.
+
+**Screen Recording permission denied:**
+
+macOS requires Screen Recording permission for `screencapture`. Grant it in System Settings → Privacy & Security → Screen Recording for the terminal running Term Chameleon.
+
+**AutoLaunch daemon not starting:**
+
+Verify the script exists and is executable:
+
+```bash
+term-chameleon watch-daemon-status
+```
+
+If the PID file is stale (process not running), remove it and restart iTerm2:
+
+```bash
+rm ~/Library/Application\ Support/term-chameleon/watch-live.pid
+```
+
+**Stale watcher process after uninstall:**
+
+`uninstall-watch-daemon` removes the AutoLaunch script but does not kill a running watcher. Stop it manually:
+
+```bash
+kill "$(cat ~/Library/Application\ Support/term-chameleon/watch-live.pid)"
+```
+
+**Daemon CPU or disk usage:**
+
+The daemon defaults to a 10-second sampling interval and prunes artifacts to the 200 most recent. To reduce overhead further, increase the interval via config or `--interval`.
+
+**iTerm2 window bounds unavailable on startup:**
+
+The daemon defaults to whole-screen sampling for startup robustness. If using `--iterm-window`, the watcher waits up to 60 seconds for iTerm2 to create a window before failing.
 
 ## Development
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from shlex import quote
 
-from .presets import COLOR_FIELD_MAP, get_preset
+from .presets import get_preset
 
 ESC = "\x1b"
 ST = ESC + "\\"
@@ -27,10 +27,6 @@ class OscSequence:
 
 def osc(code: str, payload: str, *, terminator: str = ST) -> str:
     return f"{ESC}]{code};{payload}{terminator}"
-
-
-def query_dynamic_color(code: int) -> str:
-    return osc(str(code), "?", terminator=ST)
 
 
 def reset_sequences() -> list[OscSequence]:
@@ -74,7 +70,3 @@ def shell_printf(sequences: list[OscSequence], *, tmux: bool = False) -> str:
     payload = "".join(tmux_wrap(s.sequence) if tmux else s.sequence for s in sequences)
     escaped = payload.encode("unicode_escape").decode("ascii")
     return f"printf %b {quote(escaped)}"
-
-
-def supported_color_fields() -> list[str]:
-    return sorted(COLOR_FIELD_MAP)
