@@ -1,5 +1,8 @@
 import logging
+import os
+import signal
 from pathlib import Path
+from unittest.mock import patch
 
 import term_chameleon.watch_live as watch_live_module
 from term_chameleon.images import Region
@@ -10,6 +13,7 @@ from term_chameleon.watch_live import (
     WATCH_MAX_ARTIFACTS,
     WATCH_MAX_EVENTS_BUFFER,
     WatchLiveConfig,
+    _setup_pid_ownership,
     run_watch_live,
 )
 
@@ -420,3 +424,85 @@ def test_watch_live_window_wait_times_out(tmp_path):
         assert "iTerm2 has no windows" in str(exc)
     else:
         raise AssertionError("expected RuntimeError")
+
+
+# ---------------------------------------------------------------------------
+# _setup_pid_ownership — signal cleanup (SIGTERM / SIGHUP)
+# ---------------------------------------------------------------------------
+
+
+def _pid_ownership_signal_helper(tmp_path, sig: int) -> None:
+    """Helper: verify _setup_pid_ownership removes the PID file for *sig*.
+
+    Calls the signal handler directly (does NOT send a real signal to the
+    process) so the test suite stays alive.  The handler's re-raise step
+    (os.kill) is neutralised by patching ``os.kill`` in the watch_live module
+    to be a no-op for the duration of the handler call.
+    """
+    pid_path = tmp_path / "watch.pid"
+    env_key = "TC_WATCH_PID_PATH"
+
+    original_term = signal.getsignal(signal.SIGTERM)
+    original_hup = signal.getsignal(signal.SIGHUP)
+    original_env = os.environ.get(env_key)
+    os.environ[env_key] = str(pid_path)
+
+    try:
+        _setup_pid_ownership()
+        assert pid_path.exists(), "PID file was not written"
+
+        handler = signal.getsignal(sig)
+        assert callable(handler), f"signal {sig} handler was not installed"
+
+        # Neutralise the os.kill re-raise step by patching it in the
+        # watch_live module so the handler removes the PID file but does not
+        # actually deliver the signal to the test process.
+        import term_chameleon.watch_live as _wl
+
+        with patch.object(_wl.os, "kill", lambda *_a, **_kw: None):
+            handler(sig, None)
+
+        assert not pid_path.exists(), (
+            f"PID file was not removed by signal {sig} handler"
+        )
+    finally:
+        signal.signal(signal.SIGTERM, original_term)
+        signal.signal(signal.SIGHUP, original_hup)
+        if original_env is None:
+            os.environ.pop(env_key, None)
+        else:
+            os.environ[env_key] = original_env
+
+
+def test_setup_pid_ownership_removes_pid_file_on_sigterm(tmp_path):
+    """The PID file must be removed when SIGTERM is delivered.
+
+    Tests the R4-concurrency-io fix: _setup_pid_ownership now installs a
+    SIGTERM handler so the PID file is cleaned up on the normal daemon kill
+    path (launchd, ``kill``, OS shutdown) and not only on normal/SIGINT exit.
+    """
+    _pid_ownership_signal_helper(tmp_path, signal.SIGTERM)
+
+
+def test_setup_pid_ownership_removes_pid_file_on_sighup(tmp_path):
+    """The PID file must be removed when SIGHUP is delivered."""
+    _pid_ownership_signal_helper(tmp_path, signal.SIGHUP)
+
+
+def test_setup_pid_ownership_no_op_without_env(tmp_path):
+    """_setup_pid_ownership must be a no-op when TC_WATCH_PID_PATH is unset."""
+    env_key = "TC_WATCH_PID_PATH"
+    original = os.environ.pop(env_key, None)
+    original_term = signal.getsignal(signal.SIGTERM)
+    original_hup = signal.getsignal(signal.SIGHUP)
+
+    try:
+        _setup_pid_ownership()
+        # Signal handlers should be unchanged when env var is absent.
+        assert signal.getsignal(signal.SIGTERM) is original_term
+        assert signal.getsignal(signal.SIGHUP) is original_hup
+    finally:
+        if original is not None:
+            os.environ[env_key] = original
+        signal.signal(signal.SIGTERM, original_term)
+        signal.signal(signal.SIGHUP, original_hup)

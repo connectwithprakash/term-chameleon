@@ -384,3 +384,135 @@ def test_setup_name_empty_string_does_not_fall_back_to_config(monkeypatch, tmp_p
     )
     assert len(captured_kwargs) == 1
     assert captured_kwargs[0]["name"] == ""
+
+
+# --- Fix: uninstall subcommand ---
+
+
+def test_uninstall_installed_state_exits_zero(tmp_path, capsys):
+    """uninstall with profile + AutoLaunch script installed exits 0 and reports removal."""
+    from term_chameleon.install import install_autolaunch_script, install_profile
+
+    profiles_dir = tmp_path / "profiles"
+    autolaunch_dir = tmp_path / "autolaunch"
+    state_dir = tmp_path / "state"
+    install_profile(target_dir=profiles_dir, name="Glass")
+    install_autolaunch_script(target_dir=autolaunch_dir, profile_name="Glass")
+
+    result = main(
+        [
+            "uninstall",
+            "--target-dir",
+            str(profiles_dir),
+            "--autolaunch-dir",
+            str(autolaunch_dir),
+            "--app-state-dir",
+            str(state_dir),
+        ]
+    )
+    assert result == 0
+    out = capsys.readouterr().out
+    assert "Removed profile" in out
+    assert "Removed AutoLaunch script" in out
+    assert "Term Chameleon profile uninstalled" in out
+    # Files must be gone.
+    assert not (profiles_dir / "term-chameleon-adaptive-glass.json").exists()
+    assert not (autolaunch_dir / "term_chameleon_default_profile.py").exists()
+
+
+def test_uninstall_never_installed_exits_one(tmp_path, capsys):
+    """uninstall with nothing installed exits 1 and warns without crashing."""
+    result = main(
+        [
+            "uninstall",
+            "--target-dir",
+            str(tmp_path / "profiles"),
+            "--autolaunch-dir",
+            str(tmp_path / "autolaunch"),
+            "--app-state-dir",
+            str(tmp_path / "state"),
+        ]
+    )
+    assert result == 1
+    out = capsys.readouterr().out
+    assert "nothing was installed" in out
+
+
+def test_uninstall_dry_run_leaves_files(tmp_path, capsys):
+    """uninstall --dry-run reports but does not remove files."""
+    from term_chameleon.install import install_profile
+
+    profiles_dir = tmp_path / "profiles"
+    install_profile(target_dir=profiles_dir, name="Glass")
+
+    result = main(
+        [
+            "uninstall",
+            "--dry-run",
+            "--target-dir",
+            str(profiles_dir),
+            "--autolaunch-dir",
+            str(tmp_path / "autolaunch"),
+            "--app-state-dir",
+            str(tmp_path / "state"),
+        ]
+    )
+    assert result == 0
+    out = capsys.readouterr().out
+    assert "Would remove profile" in out
+    # File must still exist after dry-run.
+    assert (profiles_dir / "term-chameleon-adaptive-glass.json").exists()
+
+
+def test_uninstall_no_backup_removes_without_backup(tmp_path, capsys):
+    """uninstall --no-backup removes files without creating backup copies."""
+    from term_chameleon.install import install_profile
+
+    profiles_dir = tmp_path / "profiles"
+    install_profile(target_dir=profiles_dir, name="Glass")
+
+    result = main(
+        [
+            "uninstall",
+            "--no-backup",
+            "--target-dir",
+            str(profiles_dir),
+            "--autolaunch-dir",
+            str(tmp_path / "autolaunch"),
+            "--app-state-dir",
+            str(tmp_path / "state"),
+        ]
+    )
+    assert result == 0
+    out = capsys.readouterr().out
+    assert "Backup:" not in out
+    assert not (profiles_dir / "term-chameleon-adaptive-glass.json").exists()
+    backups = list(profiles_dir.glob("*.backup.*"))
+    assert len(backups) == 0
+
+
+def test_uninstall_shows_previous_default_guid(tmp_path, capsys):
+    """uninstall reports the previous-default GUID when the state file exists."""
+    from term_chameleon.install import install_profile
+
+    profiles_dir = tmp_path / "profiles"
+    state_dir = tmp_path / "state"
+    install_profile(target_dir=profiles_dir, name="Glass")
+    state_dir.mkdir(parents=True)
+    (state_dir / "previous-default-guid.txt").write_text("OLD-GUID-ABCD", encoding="utf-8")
+
+    result = main(
+        [
+            "uninstall",
+            "--no-backup",
+            "--target-dir",
+            str(profiles_dir),
+            "--autolaunch-dir",
+            str(tmp_path / "autolaunch"),
+            "--app-state-dir",
+            str(state_dir),
+        ]
+    )
+    assert result == 0
+    out = capsys.readouterr().out
+    assert "OLD-GUID-ABCD" in out

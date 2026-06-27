@@ -34,10 +34,12 @@ from .e2e_stage import run_e2e_stage
 from .fixes import fix_file
 from .images import Region
 from .install import (
+    DEFAULT_APP_STATE_DIR,
     DEFAULT_AUTOLAUNCH_DIR,
     DEFAULT_DYNAMIC_PROFILES_DIR,
     install_autolaunch_script,
     install_profile,
+    uninstall_profile,
 )
 from .iterm_api import (
     check_environment,
@@ -94,6 +96,33 @@ def main(argv: list[str] | None = None) -> int:
     install.add_argument("--autolaunch-dir", type=Path, default=DEFAULT_AUTOLAUNCH_DIR)
     install.add_argument("--make-default", action="store_true")
     install.add_argument("--dry-run", action="store_true")
+
+    uninstall = sub.add_parser(
+        "uninstall",
+        help="Remove the installed Dynamic Profile JSON and make-default AutoLaunch script",
+    )
+    uninstall.add_argument(
+        "--target-dir",
+        type=Path,
+        default=DEFAULT_DYNAMIC_PROFILES_DIR,
+        help="Directory containing the installed Dynamic Profile JSON",
+    )
+    uninstall.add_argument(
+        "--autolaunch-dir",
+        type=Path,
+        default=DEFAULT_AUTOLAUNCH_DIR,
+        help="iTerm2 AutoLaunch scripts directory",
+    )
+    uninstall.add_argument(
+        "--app-state-dir",
+        type=Path,
+        default=DEFAULT_APP_STATE_DIR,
+        help="Term Chameleon app-state directory (stores previous-default GUID)",
+    )
+    uninstall.add_argument("--dry-run", action="store_true", help="Preview without removing")
+    uninstall.add_argument(
+        "--no-backup", action="store_true", help="Do not back up files before removing"
+    )
 
     install_watch = sub.add_parser(
         "install-watch-daemon",
@@ -424,6 +453,14 @@ def main(argv: list[str] | None = None) -> int:
                 preset=args.preset,
                 make_default=args.make_default,
                 dry_run=args.dry_run,
+            )
+        if args.command == "uninstall":
+            return _uninstall_profile(
+                target_dir=args.target_dir,
+                autolaunch_dir=args.autolaunch_dir,
+                app_state_dir=args.app_state_dir,
+                dry_run=args.dry_run,
+                backup=not args.no_backup,
             )
         if args.command == "install-watch-daemon":
             return _install_watch_daemon(
@@ -868,6 +905,54 @@ def _uninstall_watch_daemon(
         print("[ok] watch daemon AutoLaunch script removed")
         return 0
     print(f"Not installed: {result.target}")
+    return 1
+
+
+def _uninstall_profile(
+    *,
+    target_dir: Path,
+    autolaunch_dir: Path,
+    app_state_dir: Path,
+    dry_run: bool,
+    backup: bool,
+) -> int:
+    result = uninstall_profile(
+        target_dir=target_dir,
+        autolaunch_dir=autolaunch_dir,
+        app_state_dir=app_state_dir,
+        dry_run=dry_run,
+        backup=backup,
+    )
+    action = "Would remove" if dry_run else "Removed"
+    anything_removed = result.profile_removed or result.autolaunch_removed
+    if result.profile_removed:
+        print(f"{action} profile: {result.profile_target}")
+        if result.profile_backup_path is not None:
+            print(f"Backup: {result.profile_backup_path}")
+    else:
+        print(f"Profile not installed: {result.profile_target}")
+    if result.autolaunch_removed:
+        print(f"{action} AutoLaunch script: {result.autolaunch_target}")
+        if result.autolaunch_backup_path is not None:
+            print(f"Backup: {result.autolaunch_backup_path}")
+    else:
+        print(f"AutoLaunch script not installed: {result.autolaunch_target}")
+    if result.previous_default_guid is not None:
+        print(
+            f"Previous default profile GUID: {result.previous_default_guid}\n"
+            "  To restore: open iTerm2 > Preferences > Profiles and select the profile\n"
+            "  with that GUID (or the profile name you prefer) as the default."
+        )
+    else:
+        print(
+            "Note: make-default is not automatically reversed.\n"
+            "  To restore your prior default: open iTerm2 > Preferences > Profiles\n"
+            "  and select your preferred profile as the default."
+        )
+    if anything_removed:
+        print("[ok] Term Chameleon profile uninstalled")
+        return 0
+    print("[warn] nothing was installed; nothing to remove")
     return 1
 
 

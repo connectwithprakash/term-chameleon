@@ -105,6 +105,22 @@ class ItermProfile:
         return float(value) if value is not None else None
 
     def write(self, path: Path | None = None) -> None:
+        """Serialise the profile document and write it atomically to *path*.
+
+        ``atomic_write_text`` guarantees the target file is never half-written
+        (it uses ``os.replace`` which is atomic on POSIX), but it does **not**
+        provide mutual exclusion across the full read-modify-write span.  Two
+        concurrent write commands that both read the same baseline and then each
+        call ``write()`` will produce a lost-update: the second ``os.replace``
+        silently overwrites the first writer's changes.
+
+        This is intentional for the single-daemon usage model: the watch daemon
+        applies changes via the iTerm2 live API (not by rewriting this file), so
+        concurrent file writes from multiple CLI invocations on the same path are
+        an edge case that the caller is responsible for avoiding.  If future
+        multi-writer scenarios arise, add ``fcntl.flock`` or an equivalent
+        per-file advisory lock around the read-modify-write span in the caller.
+        """
         target = path or self.path
         if target is None:
             raise ValueError("no path supplied")

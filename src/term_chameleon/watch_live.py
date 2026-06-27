@@ -6,6 +6,7 @@ import contextlib
 import logging
 import os
 import shutil
+import signal
 import subprocess
 import time
 from collections.abc import Callable
@@ -141,9 +142,15 @@ def _setup_pid_ownership() -> None:
     """Write this process's PID to the path given by the TC_WATCH_PID_PATH env var.
 
     Called once at the start of :func:`run_watch_live`.  The file is removed
-    via :mod:`atexit` when the process exits, so the duplicate-launch guard in
-    the generated AutoLaunch script does not mistake a recycled PID for a live
-    watcher.
+    via :mod:`atexit` when the process exits normally or on SIGINT
+    (KeyboardInterrupt).  SIGTERM and SIGHUP handlers are also installed so that
+    ``kill(1)``, launchd, and system shutdown — the most common termination paths
+    for a background daemon — also clean up the PID file before exiting.
+
+    Without explicit signal handlers, ``atexit`` does NOT run on SIGTERM/SIGHUP,
+    which causes a stale PID file to remain.  If the OS later recycles that PID
+    to an unrelated live process the duplicate-launch guard treats the daemon as
+    still running and refuses to restart it (wedged daemon).
     """
     pid_path_str = os.environ.get("TC_WATCH_PID_PATH")
     if not pid_path_str:
@@ -160,6 +167,23 @@ def _setup_pid_ownership() -> None:
             pid_path.unlink(missing_ok=True)
 
     atexit.register(_remove_pid)
+
+    # Install SIGTERM and SIGHUP handlers so the PID file is removed on the
+    # normal daemon kill path (launchd, ``kill``, OS shutdown) and on reload
+    # (SIGHUP).  Each handler removes the PID file then re-raises the default
+    # action so the process actually exits with the correct signal status.
+    def _signal_cleanup(signum: int, _frame: object) -> None:
+        _remove_pid()
+        # Restore the default handler and re-raise so the process exits with
+        # the correct signal status (e.g. kill -TERM produces exit status 143).
+        signal.signal(signum, signal.SIG_DFL)
+        os.kill(os.getpid(), signum)
+
+    for _sig in (signal.SIGTERM, signal.SIGHUP):
+        # signal.signal can raise OSError (EINVAL) where the signal is
+        # unsupported (e.g. Windows); ignore silently.
+        with contextlib.suppress(OSError):
+            signal.signal(_sig, _signal_cleanup)
 
 
 def run_watch_live(

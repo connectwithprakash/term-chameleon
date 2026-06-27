@@ -3,7 +3,13 @@ import shutil
 from pathlib import Path
 
 from term_chameleon.cli import main
-from term_chameleon.install import install_autolaunch_script, install_balanced_profile
+from term_chameleon.install import (
+    _guid_for_name,
+    install_autolaunch_script,
+    install_balanced_profile,
+    install_profile,
+    uninstall_profile,
+)
 from term_chameleon.iterm_profile import load_profile, loads_document
 from term_chameleon.modes import apply_mode
 from term_chameleon.osc import OscSequence, sequences_for_preset, shell_printf, tmux_wrap
@@ -158,3 +164,215 @@ def test_visual_test_command(tmp_path, capsys):
     )
     out = capsys.readouterr().out
     assert "visual contrast simulation passed" in out
+
+
+# --- Fix: derive GUID deterministically from profile name ---
+
+
+def test_guid_for_same_name_is_stable():
+    """Same name always produces the same GUID."""
+    assert _guid_for_name("Adaptive Glass") == _guid_for_name("Adaptive Glass")
+
+
+def test_guid_for_different_names_differ():
+    """Different names produce different GUIDs."""
+    assert _guid_for_name("Adaptive Glass") != _guid_for_name("Custom Name")
+
+
+def test_profile_document_guid_is_derived_from_name():
+    """profile_document derives GUID from name, not a hardcoded literal."""
+    from term_chameleon.install import profile_document
+
+    doc1 = profile_document(name="Adaptive Glass")
+    doc2 = profile_document(name="My Profile")
+    g1 = doc1["Profiles"][0]["Guid"]
+    g2 = doc2["Profiles"][0]["Guid"]
+    assert g1 != g2
+    assert g1.startswith("TERM-CHAMELEON-")
+    assert g2.startswith("TERM-CHAMELEON-")
+
+
+def test_profile_document_explicit_guid_is_respected():
+    """Passing guid= overrides derived GUID."""
+    from term_chameleon.install import profile_document
+
+    doc = profile_document(name="Adaptive Glass", guid="MY-CUSTOM-GUID")
+    assert doc["Profiles"][0]["Guid"] == "MY-CUSTOM-GUID"
+
+
+# --- Fix: skip backup when re-install content is byte-identical ---
+
+
+def test_identical_reinstall_does_not_create_backup(tmp_path):
+    """Installing the same profile twice must not create a backup on the second install."""
+    install_profile(target_dir=tmp_path, name="Glass")
+    install_profile(target_dir=tmp_path, name="Glass")
+    backups = list(tmp_path.glob("term-chameleon-adaptive-glass.json.backup.*"))
+    assert len(backups) == 0
+
+
+def test_changed_reinstall_creates_backup(tmp_path):
+    """Installing a different profile name should produce a backup."""
+    install_profile(target_dir=tmp_path, name="First")
+    install_profile(target_dir=tmp_path, name="Second")
+    backups = list(tmp_path.glob("term-chameleon-adaptive-glass.json.backup.*"))
+    assert len(backups) == 1
+
+
+def test_identical_autolaunch_reinstall_does_not_create_backup(tmp_path):
+    """Re-installing the same AutoLaunch script must not create a backup."""
+    install_autolaunch_script(target_dir=tmp_path, profile_name="Glass")
+    install_autolaunch_script(target_dir=tmp_path, profile_name="Glass")
+    backups = list(tmp_path.glob("term_chameleon_default_profile.py.backup.*"))
+    assert len(backups) == 0
+
+
+def test_changed_autolaunch_reinstall_creates_backup(tmp_path):
+    """Re-installing AutoLaunch with a different profile name should produce a backup."""
+    install_autolaunch_script(target_dir=tmp_path, profile_name="First")
+    install_autolaunch_script(target_dir=tmp_path, profile_name="Second")
+    backups = list(tmp_path.glob("term_chameleon_default_profile.py.backup.*"))
+    assert len(backups) == 1
+
+
+# --- Fix: uninstall_profile function ---
+
+
+def test_uninstall_profile_removes_profile_and_script(tmp_path):
+    """uninstall_profile removes both the profile JSON and the AutoLaunch script."""
+    profiles_dir = tmp_path / "profiles"
+    autolaunch_dir = tmp_path / "autolaunch"
+    state_dir = tmp_path / "state"
+    install_profile(target_dir=profiles_dir, name="Glass")
+    install_autolaunch_script(target_dir=autolaunch_dir, profile_name="Glass")
+    result = uninstall_profile(
+        target_dir=profiles_dir,
+        autolaunch_dir=autolaunch_dir,
+        app_state_dir=state_dir,
+        dry_run=False,
+        backup=True,
+    )
+    assert result.profile_removed is True
+    assert result.autolaunch_removed is True
+    assert not result.profile_target.exists()
+    assert not result.autolaunch_target.exists()
+    assert result.profile_backup_path is not None
+    assert result.profile_backup_path.exists()
+    assert result.autolaunch_backup_path is not None
+    assert result.autolaunch_backup_path.exists()
+
+
+def test_uninstall_profile_never_installed_is_graceful(tmp_path):
+    """uninstall_profile on a never-installed state returns removed=False without error."""
+    result = uninstall_profile(
+        target_dir=tmp_path / "profiles",
+        autolaunch_dir=tmp_path / "autolaunch",
+        app_state_dir=tmp_path / "state",
+        dry_run=False,
+        backup=True,
+    )
+    assert result.profile_removed is False
+    assert result.autolaunch_removed is False
+    assert result.profile_backup_path is None
+    assert result.autolaunch_backup_path is None
+
+
+def test_uninstall_profile_dry_run_does_not_remove(tmp_path):
+    """uninstall_profile --dry-run reports what would be removed but leaves files intact."""
+    profiles_dir = tmp_path / "profiles"
+    autolaunch_dir = tmp_path / "autolaunch"
+    install_profile(target_dir=profiles_dir, name="Glass")
+    install_autolaunch_script(target_dir=autolaunch_dir, profile_name="Glass")
+    result = uninstall_profile(
+        target_dir=profiles_dir,
+        autolaunch_dir=autolaunch_dir,
+        app_state_dir=tmp_path / "state",
+        dry_run=True,
+        backup=True,
+    )
+    # Reports removed=True (would remove) but files are still present.
+    assert result.profile_removed is True
+    assert result.autolaunch_removed is True
+    assert result.profile_target.exists()
+    assert result.autolaunch_target.exists()
+    # No backup created on dry-run.
+    assert result.profile_backup_path is None
+    assert result.autolaunch_backup_path is None
+
+
+def test_uninstall_profile_no_backup_option(tmp_path):
+    """uninstall_profile with backup=False removes files without creating backups."""
+    profiles_dir = tmp_path / "profiles"
+    autolaunch_dir = tmp_path / "autolaunch"
+    install_profile(target_dir=profiles_dir, name="Glass")
+    install_autolaunch_script(target_dir=autolaunch_dir, profile_name="Glass")
+    result = uninstall_profile(
+        target_dir=profiles_dir,
+        autolaunch_dir=autolaunch_dir,
+        app_state_dir=tmp_path / "state",
+        dry_run=False,
+        backup=False,
+    )
+    assert result.profile_removed is True
+    assert result.autolaunch_removed is True
+    assert result.profile_backup_path is None
+    assert result.autolaunch_backup_path is None
+
+
+def test_uninstall_profile_reads_previous_default_guid(tmp_path):
+    """uninstall_profile reads the persisted previous-default GUID if it exists."""
+    state_dir = tmp_path / "state"
+    state_dir.mkdir(parents=True)
+    (state_dir / "previous-default-guid.txt").write_text("MY-GUID-BEFORE", encoding="utf-8")
+    result = uninstall_profile(
+        target_dir=tmp_path / "profiles",
+        autolaunch_dir=tmp_path / "autolaunch",
+        app_state_dir=state_dir,
+        dry_run=False,
+        backup=False,
+    )
+    assert result.previous_default_guid == "MY-GUID-BEFORE"
+
+
+def test_uninstall_profile_missing_guid_file_returns_none(tmp_path):
+    """uninstall_profile returns previous_default_guid=None if the GUID file is absent."""
+    result = uninstall_profile(
+        target_dir=tmp_path / "profiles",
+        autolaunch_dir=tmp_path / "autolaunch",
+        app_state_dir=tmp_path / "state",
+        dry_run=False,
+        backup=False,
+    )
+    assert result.previous_default_guid is None
+
+
+def test_uninstall_profile_partial_install_only_profile(tmp_path):
+    """uninstall_profile handles partial installs: only profile present, no AutoLaunch script."""
+    profiles_dir = tmp_path / "profiles"
+    install_profile(target_dir=profiles_dir, name="Glass")
+    result = uninstall_profile(
+        target_dir=profiles_dir,
+        autolaunch_dir=tmp_path / "autolaunch",
+        app_state_dir=tmp_path / "state",
+        dry_run=False,
+        backup=True,
+    )
+    assert result.profile_removed is True
+    assert result.autolaunch_removed is False
+    assert not result.profile_target.exists()
+
+
+def test_uninstall_profile_partial_install_only_autolaunch(tmp_path):
+    """uninstall_profile handles partial installs: only AutoLaunch script present."""
+    autolaunch_dir = tmp_path / "autolaunch"
+    install_autolaunch_script(target_dir=autolaunch_dir, profile_name="Glass")
+    result = uninstall_profile(
+        target_dir=tmp_path / "profiles",
+        autolaunch_dir=autolaunch_dir,
+        app_state_dir=tmp_path / "state",
+        dry_run=False,
+        backup=True,
+    )
+    assert result.profile_removed is False
+    assert result.autolaunch_removed is True
+    assert not result.autolaunch_target.exists()

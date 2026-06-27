@@ -3,11 +3,30 @@ from __future__ import annotations
 import asyncio
 import threading
 from collections.abc import Callable
+from contextlib import suppress
 from dataclasses import dataclass
 from typing import Any
 
 DEFAULT_PROBE_TIMEOUT = 10.0
 DEFAULT_APPLY_TIMEOUT = 15.0
+
+# Lock that serializes run_iterm_bounded callers so that at most one worker
+# thread is active at a time.  When a previous worker timed out and was
+# abandoned, the next caller must wait for the lock rather than launching a
+# second concurrent worker.  This prevents two failure modes:
+#
+# 1. Thread/fd accumulation: abandoned workers hold asyncio selector fds until
+#    their finally block eventually runs.  Serializing ensures at most one
+#    abandoned worker exists at any moment.
+#
+# 2. Stale out-of-order applies: an abandoned worker that completes after the
+#    watch loop has moved on would silently overwrite the current session mode.
+#    Serializing means the next apply waits for the prior (abandoned) worker to
+#    finish before proceeding, so mode changes are always applied in order.
+#
+# The lock is process-global because iterm2's event loop is thread-local and
+# there is only one meaningful "current session" per process.
+_apply_lock = threading.Lock()
 
 
 @dataclass(frozen=True)
@@ -29,7 +48,10 @@ def run_iterm_bounded(coro_fn: Callable[..., Any], timeout: float) -> Any:
     immediately rather than waiting for the garbage collector.
 
     On timeout the worker thread is abandoned (it is a daemon thread so it
-    dies with the process) and ``RuntimeError`` is raised.
+    dies with the process) and ``RuntimeError`` is raised.  The module-level
+    ``_apply_lock`` serializes callers so that a new call blocks until any prior
+    (possibly abandoned) worker thread finishes, preventing both fd accumulation
+    and stale out-of-order session mutations.
 
     Returns the value returned by the coroutine.  Re-raises any exception
     raised inside the coroutine.
@@ -62,12 +84,22 @@ def run_iterm_bounded(coro_fn: Callable[..., Any], timeout: float) -> Any:
                     loop.close()
             except RuntimeError:
                 pass
+            # Release the serialization lock so the next caller can proceed.
+            with suppress(RuntimeError):
+                _apply_lock.release()
 
+    # Acquire the lock before launching the worker.  This blocks if a prior
+    # worker is still alive (e.g. was abandoned on a previous timeout), ensuring
+    # at most one worker runs at a time.
+    _apply_lock.acquire()
     worker = threading.Thread(target=run, daemon=True)
     worker.start()
     worker.join(timeout)
 
     if worker.is_alive():
+        # Worker timed out but is still running.  The lock will be released by
+        # the worker's finally block when it eventually finishes.  We do NOT
+        # release it here so the next caller is blocked until that happens.
         raise RuntimeError(f"iTerm2 operation timed out after {timeout:g}s")
 
     if "error" in result_box:

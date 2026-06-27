@@ -16,7 +16,7 @@
 - Renamed `_setter_mappings` to `setter_mappings` (public API).
 - Narrowed `except Exception` to `except (KeyError, ValueError, TypeError)` in `fixes.py` and `modes.py`.
 - Replaced runtime `assert` with explicit `ConfigError` in daemon path resolution and config validation.
-- Added `help=` text to all key CLI arguments.
+- Added `help=` text to most CLI arguments (some positionals and optional flags remain undocumented).
 - Made `release-check` status step pass on CI environments without iTerm2 installed.
 
 ## 0.1.0 - 2026-06-27
@@ -27,7 +27,7 @@
 - Removed dead code (`query_dynamic_color`, `supported_color_fields`).
 - Replaced runtime `assert` with explicit `ConfigError` raises for daemon path resolution and region validation.
 - Added `__all__` to package `__init__`.
-- Added `help=` text to all key CLI arguments.
+- Added `help=` text to most CLI arguments (some positionals and optional flags remain undocumented).
 - Added README Troubleshooting section.
 - Promoted classifier to `Development Status :: 5 - Production/Stable`.
 

@@ -6,7 +6,7 @@ Glassy terminal themes look good until white text disappears over a bright windo
 
 ## Current status
 
-This repository is prepared as `v0.1.1` / Python package version `0.1.1`: a dogfooded beta for static profile diagnostics, safe profile mutation, deterministic visual artifacts, live iTerm2 adaptation, controlled macOS GUI/screenshot QA, and real iTerm2 AutoLaunch watcher operation. Implemented:
+This repository is `v0.1.1` / Python package version `0.1.1` (Production/Stable): a dogfooded stable release for static profile diagnostics, safe profile mutation, deterministic visual artifacts, live iTerm2 adaptation, controlled macOS GUI/screenshot QA, and real iTerm2 AutoLaunch watcher operation. Implemented:
 
 - iTerm2 Dynamic Profile JSON parsing.
 - Color conversion between hex and iTerm2 color dictionaries.
@@ -42,20 +42,20 @@ Optional future refinements:
 - Live session mutation for Kitty/Ghostty (currently OSC-only for non-iTerm2 terminals).
 - PyPI publish via trusted publishing (requires pypi.org configuration).
 
-## Beta release verification
+## Release verification
 
-Build and install the beta wheel locally:
+Build and install the stable wheel locally:
 
 ```bash
 uv build
-python3 -m venv /tmp/term-chameleon-beta-venv
-/tmp/term-chameleon-beta-venv/bin/pip install 'dist/term_chameleon-0.1.1-py3-none-any.whl[iterm]'
-/tmp/term-chameleon-beta-venv/bin/term-chameleon setup --yes
-/tmp/term-chameleon-beta-venv/bin/term-chameleon release-check --output-dir /tmp/term-chameleon-beta-release-check
-/tmp/term-chameleon-beta-venv/bin/term-chameleon release-check --output-dir /tmp/term-chameleon-beta-live-check --live --live-stage --threshold 1.0
+python3 -m venv /tmp/term-chameleon-venv
+/tmp/term-chameleon-venv/bin/pip install 'dist/term_chameleon-0.1.1-py3-none-any.whl[iterm]'
+/tmp/term-chameleon-venv/bin/term-chameleon setup --yes
+/tmp/term-chameleon-venv/bin/term-chameleon release-check --output-dir /tmp/term-chameleon-release-check
+/tmp/term-chameleon-venv/bin/term-chameleon release-check --output-dir /tmp/term-chameleon-live-check --live --live-stage --threshold 1.0
 ```
 
-The real iTerm2 AutoLaunch watcher was dogfooded for this beta by installing the daemon, restarting iTerm2, verifying a single running watcher process, checking daemon status, and confirming screenshot sample artifacts were written.
+The real iTerm2 AutoLaunch watcher was dogfooded by installing the daemon, restarting iTerm2, verifying a single running watcher process, checking daemon status, and confirming screenshot sample artifacts were written.
 
 See [CHANGELOG.md](CHANGELOG.md) for release notes.
 
@@ -162,6 +162,27 @@ Manual live smoke test, once iTerm2 is running and the Python API is enabled:
 
 ```bash
 scripts/live-iterm-smoke.sh
+```
+
+Detect the current terminal and apply OSC color sequences for cross-terminal support (iTerm2, Kitty, Ghostty, Alacritty):
+
+```bash
+term-chameleon terminal-info
+term-chameleon terminal-info --json
+term-chameleon osc apply balanced
+term-chameleon osc apply balanced --write
+term-chameleon osc apply balanced --tmux
+term-chameleon osc apply balanced --shell
+term-chameleon osc reset
+```
+
+`osc apply <preset> --write` writes raw OSC 10/11/4 escape sequences directly to stdout for any OSC-capable terminal. Use `--tmux` inside a tmux session or `--shell` to get a printf-safe command. `terminal-info` reports the detected terminal type and capability flags.
+
+Run the mode risk-classifier and hysteresis simulator:
+
+```bash
+term-chameleon watch-sim 0.2 0.8 0.5
+term-chameleon watch-sim --stable 2 0.2 0.2 0.8 0.8
 ```
 
 Run deterministic visual simulation:

@@ -24,11 +24,19 @@ def unique_backup_path(path: str | Path) -> Path:
 
 
 def _prune_backups(source: Path, keep: int = MAX_BACKUPS) -> None:
-    """Remove the oldest `<name>.backup.*` files, keeping the *keep* most recent."""
-    existing = sorted(
-        source.parent.glob(f"{source.name}.backup.*"),
-        key=lambda p: p.stat().st_mtime,
-    )
+    """Remove the oldest `<name>.backup.*` files, keeping the *keep* most recent.
+
+    Collects (path, mtime) pairs inside a per-file try/except so that a
+    concurrent pruner that already unlinked a globbed path does not raise
+    FileNotFoundError (mirrors the race-safe pattern in _prune_artifacts).
+    """
+    pairs: list[tuple[float, Path]] = []
+    for p in source.parent.glob(f"{source.name}.backup.*"):
+        # File may vanish between glob and stat (concurrent pruner); skip it.
+        with suppress(OSError):
+            pairs.append((p.stat().st_mtime, p))
+    pairs.sort(key=lambda t: t[0])
+    existing = [p for _, p in pairs]
     for old in existing[:-keep] if keep > 0 else existing:
         with suppress(OSError):
             old.unlink()
@@ -49,6 +57,7 @@ def atomic_write_text(path: str | Path, content: str) -> None:
     target.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp_name = tempfile.mkstemp(prefix=f".{target.name}.", suffix=".tmp", dir=target.parent)
     tmp = Path(tmp_name)
+    success = False
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as handle:
             handle.write(content)
@@ -57,7 +66,12 @@ def atomic_write_text(path: str | Path, content: str) -> None:
             with suppress(OSError):
                 os.fsync(handle.fileno())
         tmp.replace(target)
-    except Exception:
-        with suppress(OSError):
-            tmp.unlink()
-        raise
+        success = True
+    finally:
+        # On any failure path (exception or abnormal exit) best-effort remove
+        # the temp file so the target directory is not littered with orphans.
+        # On success tmp was already atomically renamed to target; the unlink
+        # is a no-op that raises OSError which suppress() silences.
+        if not success:
+            with suppress(OSError):
+                tmp.unlink(missing_ok=True)

@@ -66,7 +66,23 @@ end tell
             message=raw or "could not read iTerm2 bounds; use --region x,y,width,height",
         )
     if raw.startswith("OK|"):
-        return WindowBoundsResult(True, Region.parse(raw.removeprefix("OK|")), raw)
+        try:
+            region = Region.parse(raw.removeprefix("OK|"))
+        except ValueError as exc:
+            # AppleScript returns negative left/top when the iTerm2 window is on a
+            # secondary monitor placed to the left of, or above, the main display.
+            # Region rejects negative x/y, so we surface a clear message instead of
+            # propagating an uncaught ValueError out of get_iterm_window_bounds().
+            return WindowBoundsResult(
+                False,
+                None,
+                (
+                    f"iTerm2 window has a negative screen origin ({raw.removeprefix('OK|')}); "
+                    "it is likely on a secondary monitor — use --region x,y,width,height to "
+                    f"specify the capture area explicitly ({exc})"
+                ),
+            )
+        return WindowBoundsResult(True, region, raw)
     if raw.startswith("ERROR|"):
         return WindowBoundsResult(False, None, raw.removeprefix("ERROR|"))
     return WindowBoundsResult(False, None, raw or "unexpected iTerm2 bounds response")
@@ -109,6 +125,23 @@ def _points_region_to_screenshot_pixels(region: Region) -> Region:
     point_height = bottom - top
     if point_width <= 0 or point_height <= 0:
         raise RuntimeError(f"invalid desktop bounds: {left},{top},{right},{bottom}")
+    # screencapture -x (no -D flag) captures only the main display, but Finder
+    # 'bounds of window of desktop' returns the union of ALL displays on a multi-
+    # monitor setup (left/top can be negative, width/height span every screen).
+    # Dividing screenshot pixels by the full-desktop point size yields wrong scale
+    # factors and can map iTerm2 window coordinates outside the captured image.
+    # Detect the mismatch: if the desktop origin is not (0, 0) a secondary display
+    # extends to the left or above the main display, making the denominators
+    # inconsistent.  Fail early with a clear message so callers can ask the user
+    # for an explicit --region instead of silently producing a mis-scaled crop.
+    if left != 0 or top != 0:
+        raise RuntimeError(
+            "multi-monitor layout detected (Finder desktop origin is "
+            f"{left},{top}): screencapture captures only the main display but "
+            "Finder desktop bounds span all displays, so window-to-pixel scaling "
+            "would be incorrect — use --region x,y,width,height to specify the "
+            "capture area explicitly"
+        )
     scale_x = screenshot_width / point_width
     scale_y = screenshot_height / point_height
     x = round((region.x - left) * scale_x)
