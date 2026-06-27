@@ -169,9 +169,14 @@ def _config_step(config_path: str | Path) -> ReleaseCheckStep:
 
 
 def _status_step(report: StatusReport, *, live: bool) -> ReleaseCheckStep:
+    import sys
+
     if live:
         passed = report.ready_for_live
         detail = "live iTerm2 readiness passed" if passed else report.recommended_next_command
+    elif sys.platform != "darwin":
+        passed = True
+        detail = "offline readiness passed (non-macOS: iTerm2 checks skipped)"
     else:
         required = {"profile", "screencapture", "iterm-app", "iterm-python-package"}
         by_name = {check.name: check for check in report.checks}
