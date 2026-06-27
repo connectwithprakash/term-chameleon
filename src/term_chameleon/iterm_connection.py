@@ -67,9 +67,7 @@ def run_iterm_bounded(coro_fn: Callable[..., Any], timeout: float) -> Any:
         try:
             result_box["value"] = iterm2.run_until_complete(coro_fn)
         except SystemExit as exc:
-            result_box["error"] = RuntimeError(
-                f"iTerm2 connection exited with status {exc.code}"
-            )
+            result_box["error"] = RuntimeError(f"iTerm2 connection exited with status {exc.code}")
         except Exception as exc:  # noqa: BLE001
             result_box["error"] = exc
         finally:

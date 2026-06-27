@@ -15,14 +15,17 @@ from term_chameleon.iterm_connection import (
 # run_iterm_bounded — unit tests for the shared helper
 # ---------------------------------------------------------------------------
 
+
 def _make_fake_iterm2_for_bounded(*, hang: bool = False):
     """Minimal fake iterm2 module for run_iterm_bounded tests."""
     fake = types.ModuleType("iterm2")
 
     if hang:
+
         def run_until_complete(coro_fn):
             time.sleep(30)
     else:
+
         def run_until_complete(coro_fn):
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
@@ -141,6 +144,7 @@ def test_run_iterm_bounded_raises_when_iterm2_missing(monkeypatch):
 # ---------------------------------------------------------------------------
 # probe_iterm_connection — integration tests (use run_iterm_bounded internally)
 # ---------------------------------------------------------------------------
+
 
 def test_probe_iterm_connection_returns_structured_result():
     result = probe_iterm_connection()

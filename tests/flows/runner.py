@@ -32,6 +32,7 @@ def detect_capabilities() -> set[str]:
             caps.add("iterm2-capable")
     return caps
 
+
 # An uncaught Python exception is never an acceptable user-facing outcome.
 TRACEBACK_MARKER = "Traceback (most recent call last)"
 

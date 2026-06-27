@@ -15,6 +15,7 @@ class InvalidExecutableError(ValueError):
 
     pass
 
+
 WATCH_AUTOLAUNCH_FILENAME = "term_chameleon_watch_live.py"
 DEFAULT_LOG_PATH = Path.home() / "Library" / "Logs" / "term-chameleon-watch-live.log"
 DEFAULT_PID_PATH = (
@@ -92,9 +93,7 @@ def validate_executable(executable: str) -> None:
         raise InvalidExecutableError("Executable path cannot be empty")
 
     if any(char in executable for char in (";", "|", "&", "$", "`", "\n", "\r")):
-        raise InvalidExecutableError(
-            "Executable path contains shell metacharacters (disallowed)"
-        )
+        raise InvalidExecutableError("Executable path contains shell metacharacters (disallowed)")
 
     expanded = Path(executable).expanduser()
 

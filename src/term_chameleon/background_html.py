@@ -111,6 +111,4 @@ def open_file(path: str | Path, timeout: float = 10.0) -> subprocess.CompletedPr
             timeout=timeout,
         )
     except subprocess.TimeoutExpired as exc:
-        raise RuntimeError(
-            f"open timed out after {timeout}s waiting for {path}"
-        ) from exc
+        raise RuntimeError(f"open timed out after {timeout}s waiting for {path}") from exc

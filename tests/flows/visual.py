@@ -146,10 +146,17 @@ def run_visual_step(step: Step, variables: dict) -> StepResult:
         if background:
             subprocess.run(
                 [
-                    sys.executable, "-m", "term_chameleon.cli",
-                    "background-html", "--output-dir", str(workdir / "bg"),
+                    sys.executable,
+                    "-m",
+                    "term_chameleon.cli",
+                    "background-html",
+                    "--output-dir",
+                    str(workdir / "bg"),
                 ],
-                cwd=REPO_ROOT, capture_output=True, text=True, timeout=30,
+                cwd=REPO_ROOT,
+                capture_output=True,
+                text=True,
+                timeout=30,
             )
 
         # Apply the requested mode via OSC to the live session (universal path).
@@ -157,7 +164,10 @@ def run_visual_step(step: Step, variables: dict) -> StepResult:
         if preset:
             subprocess.run(
                 [sys.executable, "-m", "term_chameleon.cli", "osc", "apply", preset],
-                cwd=REPO_ROOT, capture_output=True, text=True, timeout=15,
+                cwd=REPO_ROOT,
+                capture_output=True,
+                text=True,
+                timeout=15,
             )
 
         # Let the terminal render before capturing.
@@ -185,9 +195,7 @@ def run_visual_step(step: Step, variables: dict) -> StepResult:
                 else:
                     ratio = _measure_capture_contrast(capture, workdir)
                     if ratio < float(threshold):
-                        failures.append(
-                            f"captured contrast {ratio:.2f} < required {threshold}"
-                        )
+                        failures.append(f"captured contrast {ratio:.2f} < required {threshold}")
     except (RuntimeError, subprocess.TimeoutExpired, OSError) as exc:
         failures.append(f"visual step error: {exc}")
 

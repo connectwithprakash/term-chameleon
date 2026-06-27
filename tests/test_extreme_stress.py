@@ -129,19 +129,15 @@ class TestPixelContrastExtremes:
 
     def test_estimate_contrast_extreme_percentiles(self):
         """Contrast with extreme percentile values."""
-        pixels = [Color(r=i/255.0, g=i/255.0, b=i/255.0) for i in range(0, 256)]
+        pixels = [Color(r=i / 255.0, g=i / 255.0, b=i / 255.0) for i in range(0, 256)]
         image = RasterImage(width=256, height=1, pixels=tuple(pixels))
 
         # Tiny percentile
-        estimate_tiny = estimate_raster_contrast(
-            image, threshold=4.5, percentile=0.001
-        )
+        estimate_tiny = estimate_raster_contrast(image, threshold=4.5, percentile=0.001)
         assert estimate_tiny.sampled_pixels >= 1
 
         # Large percentile (approaching 0.5 limit)
-        estimate_large = estimate_raster_contrast(
-            image, threshold=4.5, percentile=0.5
-        )
+        estimate_large = estimate_raster_contrast(image, threshold=4.5, percentile=0.5)
         assert estimate_large.sampled_pixels > 0
 
     def test_estimate_contrast_invalid_percentile_zero(self):
@@ -175,7 +171,7 @@ class TestPixelContrastExtremes:
         """Stress test with very large pixel set."""
         # 100k pixels
         pixels = [
-            Color(r=(i % 256)/255.0, g=((i * 2) % 256)/255.0, b=((i * 3) % 256)/255.0)
+            Color(r=(i % 256) / 255.0, g=((i * 2) % 256) / 255.0, b=((i * 3) % 256) / 255.0)
             for i in range(100000)
         ]
         image = RasterImage(width=500, height=200, pixels=tuple(pixels))
@@ -298,9 +294,7 @@ class TestConcurrencyStress:
             except Exception as e:
                 errors.append(e)
 
-        threads = [
-            threading.Thread(target=calculate_contrasts) for _ in range(5)
-        ]
+        threads = [threading.Thread(target=calculate_contrasts) for _ in range(5)]
         for thread in threads:
             thread.start()
         for thread in threads:
@@ -339,7 +333,7 @@ class TestMemoryStress:
         """Process image with millions of pixels."""
         # 2 million pixel image
         pixels = [
-            Color(r=(i % 256)/255.0, g=((i * 2) % 256)/255.0, b=((i * 3) % 256)/255.0)
+            Color(r=(i % 256) / 255.0, g=((i * 2) % 256) / 255.0, b=((i * 3) % 256) / 255.0)
             for i in range(2000000)
         ]
         image = RasterImage(width=2000, height=1000, pixels=tuple(pixels))
@@ -381,9 +375,7 @@ class TestTimeoutAndLongRunning:
         for i in range(10000):
             for j in range(100):
                 color = Color(
-                    r=((i + j) % 256) / 255.0,
-                    g=((i - j) % 256) / 255.0,
-                    b=((i * j) % 256) / 255.0
+                    r=((i + j) % 256) / 255.0, g=((i - j) % 256) / 255.0, b=((i * j) % 256) / 255.0
                 )
                 pixels.append(color)
         elapsed = time.time() - start
@@ -411,7 +403,7 @@ class TestResourceExhaustion:
         estimates = []
         for _ in range(100):  # Reduced from 1000 for runtime
             pixels = [
-                Color(r=(j % 256)/255.0, g=((j * 2) % 256)/255.0, b=((j * 3) % 256)/255.0)
+                Color(r=(j % 256) / 255.0, g=((j * 2) % 256) / 255.0, b=((j * 3) % 256) / 255.0)
                 for j in range(1000)
             ]
             image = RasterImage(width=40, height=25, pixels=tuple(pixels))
@@ -425,7 +417,7 @@ class TestResourceExhaustion:
         """Create and store many color objects."""
         colors = []
         for i in range(100000):
-            color = Color(r=(i % 256)/255.0, g=((i * 2) % 256)/255.0, b=((i * 3) % 256)/255.0)
+            color = Color(r=(i % 256) / 255.0, g=((i * 2) % 256) / 255.0, b=((i * 3) % 256) / 255.0)
             colors.append(color)
 
         assert len(colors) == 100000
@@ -447,7 +439,7 @@ class TestInvalidInputCombinations:
         """Colors that might produce NaN in luminance calculations."""
         # These shouldn't cause NaN or Inf issues
         color1 = Color(r=1.0, g=1.0, b=1.0)
-        color2 = Color(r=254.0/255.0, g=254.0/255.0, b=254.0/255.0)
+        color2 = Color(r=254.0 / 255.0, g=254.0 / 255.0, b=254.0 / 255.0)
         ratio = contrast_ratio(color1, color2)
         assert ratio > 0
         assert ratio < float("inf")
@@ -463,7 +455,9 @@ class TestInvalidInputCombinations:
 
     def test_single_color_many_pixels(self):
         """All pixels identical but many of them."""
-        pixels = [Color(r=200.0/255.0, g=100.0/255.0, b=50.0/255.0)] * 100000  # Reduced from 1M
+        pixels = [
+            Color(r=200.0 / 255.0, g=100.0 / 255.0, b=50.0 / 255.0)
+        ] * 100000  # Reduced from 1M
         image = RasterImage(width=500, height=200, pixels=tuple(pixels))
         estimate = estimate_raster_contrast(image)
         assert estimate.contrast == pytest.approx(1.0)
@@ -502,7 +496,7 @@ class TestBoundaryIntegration:
         """Test full spectrum of contrast values."""
         colors = []
         for i in range(256):
-            color = Color(r=i/255.0, g=i/255.0, b=i/255.0)
+            color = Color(r=i / 255.0, g=i / 255.0, b=i / 255.0)
             colors.append(color)
 
         for i in range(len(colors) - 1):
@@ -531,14 +525,12 @@ class TestBoundaryIntegration:
         for _ in range(10):
             for i in range(1000):
                 color1 = Color(
-                    r=(i % 256)/255.0,
-                    g=((i * 2) % 256)/255.0,
-                    b=((i * 3) % 256)/255.0
+                    r=(i % 256) / 255.0, g=((i * 2) % 256) / 255.0, b=((i * 3) % 256) / 255.0
                 )
                 color2 = Color(
-                    r=((255 - i) % 256)/255.0,
-                    g=((255 - i * 2) % 256)/255.0,
-                    b=((255 - i * 3) % 256)/255.0
+                    r=((255 - i) % 256) / 255.0,
+                    g=((255 - i * 2) % 256) / 255.0,
+                    b=((255 - i * 3) % 256) / 255.0,
                 )
                 ratio = contrast_ratio(color1, color2)
                 results.append(ratio)

@@ -80,9 +80,9 @@ def test_iterm_stage_script_escapes_double_quotes(tmp_path):
     # Test that double quotes are escaped
     escaped = _escape_applescript_string('hello "world"')
     # The function escapes quotes with backslash (AppleScript requires \")
-    assert escaped == r'hello \"world\"'
+    assert escaped == r"hello \"world\""
     # Verify the escaping prevents breaking out of the AppleScript string
-    assert 'hello \\\"world\\\"' in escaped or escaped == r'hello \"world\"'
+    assert 'hello \\"world\\"' in escaped or escaped == r"hello \"world\""
 
 
 def test_iterm_stage_script_escapes_backslashes(tmp_path):
@@ -90,8 +90,8 @@ def test_iterm_stage_script_escapes_backslashes(tmp_path):
     from term_chameleon.live_stage import _escape_applescript_string
 
     # Test that backslashes are escaped (important on Windows paths or shell escapes)
-    escaped = _escape_applescript_string('C:\\Users\\test')
-    assert escaped == 'C:\\\\Users\\\\test'
+    escaped = _escape_applescript_string("C:\\Users\\test")
+    assert escaped == "C:\\\\Users\\\\test"
 
 
 def test_iterm_stage_script_rejects_injection_attempt(tmp_path):

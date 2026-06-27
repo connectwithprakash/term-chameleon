@@ -131,8 +131,8 @@ def test_deterministic_e2e_step_respects_screenshot_captured_false(monkeypatch, 
         visual_report_md=str(e2e_out / "visual-report.md"),
         screenshot_report_json=str(e2e_out / "screenshot-report.json"),
         screenshot_report_md=str(e2e_out / "screenshot-report.md"),
-        screenshot_captured=False,   # capture was requested but failed
-        visual_checks_passed=True,   # visuals passed
+        screenshot_captured=False,  # capture was requested but failed
+        visual_checks_passed=True,  # visuals passed
         visual_checks_failed=0,
     )
     # E2EStageReport.passed must be False because screenshot_captured=False

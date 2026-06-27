@@ -1,4 +1,3 @@
-
 import pytest
 from pytest import approx
 
@@ -191,8 +190,7 @@ def test_to_hex_and_quantize_byte_agree_on_exact_half_components():
         c = Color(component, 0.0, 0.0)
         actual_byte = int(c.to_hex()[1:3], 16)
         assert actual_byte == expected_byte, (
-            f"component {component}: to_hex byte {actual_byte} != "
-            f"_quantize_byte {expected_byte}"
+            f"component {component}: to_hex byte {actual_byte} != _quantize_byte {expected_byte}"
         )
 
 

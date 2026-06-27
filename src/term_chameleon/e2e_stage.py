@@ -26,9 +26,7 @@ class E2EStageReport:
     @property
     def passed(self) -> bool:
         """Return True when visual checks passed and any requested capture succeeded."""
-        return self.visual_checks_passed and (
-            self.screenshot_captured is not False
-        )
+        return self.visual_checks_passed and (self.screenshot_captured is not False)
 
 
 def run_e2e_stage(
@@ -54,9 +52,7 @@ def run_e2e_stage(
 
     failed_checks = [c for c in checks if not c.passed]
     screenshot_captured: bool | None = (
-        screenshot_report.screenshot.captured
-        if screenshot_report.screenshot is not None
-        else None
+        screenshot_report.screenshot.captured if screenshot_report.screenshot is not None else None
     )
     report = E2EStageReport(
         output_dir=out,

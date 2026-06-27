@@ -6,6 +6,7 @@ Covers:
 - happy path: successful apply returns LiveApplyResult(applied=True)
 - error path: iterm2 exceptions are re-raised as RuntimeError
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -22,6 +23,7 @@ from term_chameleon.live_iterm import LiveApplyResult, apply_preset_to_current_s
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_fake_iterm2(*, hang: bool = False, raises: Exception | None = None):
     """Build a minimal fake iterm2 module suitable for monkeypatching."""
     fake = types.ModuleType("iterm2")
@@ -37,6 +39,7 @@ def _make_fake_iterm2(*, hang: bool = False, raises: Exception | None = None):
         def __getattr__(self, name):
             def setter(value):
                 self._calls.append(name)
+
             return setter
 
     class FakeSession:
@@ -66,16 +69,19 @@ def _make_fake_iterm2(*, hang: bool = False, raises: Exception | None = None):
     fake.async_get_app = fake_async_get_app
 
     if hang:
+
         def run_until_complete(coro_fn):
             time.sleep(30)
 
         fake.run_until_complete = run_until_complete
     elif raises is not None:
+
         def run_until_complete(coro_fn):
             raise raises
 
         fake.run_until_complete = run_until_complete
     else:
+
         def run_until_complete(coro_fn):
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
@@ -93,6 +99,7 @@ def _make_fake_iterm2(*, hang: bool = False, raises: Exception | None = None):
 # ---------------------------------------------------------------------------
 # Timeout test (Finding 1 HIGH)
 # ---------------------------------------------------------------------------
+
 
 def test_apply_preset_times_out_on_hung_daemon(monkeypatch):
     """A hung iterm2.run_until_complete must raise RuntimeError within the timeout."""
@@ -119,6 +126,7 @@ def test_apply_preset_timeout_result_is_runtime_error(monkeypatch):
 # ---------------------------------------------------------------------------
 # Fd-reclamation test (Finding 2 HIGH)
 # ---------------------------------------------------------------------------
+
 
 def test_apply_preset_closes_event_loop_after_each_call(monkeypatch):
     """The asyncio event loop must be closed after each apply to prevent fd leaks.
@@ -160,14 +168,13 @@ def test_apply_preset_closes_event_loop_after_each_call(monkeypatch):
             closed_states.append(real_loop[0].is_closed())
 
     # Every loop captured must have been closed by run_iterm_bounded
-    assert all(closed_states), (
-        f"Some event loops were not closed after apply: {closed_states}"
-    )
+    assert all(closed_states), f"Some event loops were not closed after apply: {closed_states}"
 
 
 # ---------------------------------------------------------------------------
 # Error propagation
 # ---------------------------------------------------------------------------
+
 
 def test_apply_preset_propagates_iterm2_runtime_error(monkeypatch):
     """Exceptions from within the iterm2 coroutine surface as RuntimeError."""
@@ -190,6 +197,7 @@ def test_apply_preset_propagates_system_exit_as_runtime_error(monkeypatch):
 # ---------------------------------------------------------------------------
 # Happy path
 # ---------------------------------------------------------------------------
+
 
 def test_apply_preset_happy_path_returns_live_apply_result(monkeypatch):
     """A successful apply returns LiveApplyResult with applied=True."""

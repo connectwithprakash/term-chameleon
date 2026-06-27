@@ -209,9 +209,7 @@ def run_watch_live(
     next_allowed_switch = start
     # Bounded ring buffer: keeps at most WATCH_MAX_EVENTS_BUFFER events in
     # memory so the long-running daemon does not exhaust RAM.
-    events: collections.deque[WatchLiveEvent] = collections.deque(
-        maxlen=WATCH_MAX_EVENTS_BUFFER
-    )
+    events: collections.deque[WatchLiveEvent] = collections.deque(maxlen=WATCH_MAX_EVENTS_BUFFER)
     index = 0
 
     while True:
@@ -274,8 +272,7 @@ def run_watch_live(
         marker = "switch" if event.switched else "hold"
         apply_marker = " applied" if event.applied else ""
         logger.info(
-            "%d: t=%.1fs lum=%.3f var=%.3f risk=%s candidate=%s mode=%s %s%s "
-            "reason=%s message=%s",
+            "%d: t=%.1fs lum=%.3f var=%.3f risk=%s candidate=%s mode=%s %s%s reason=%s message=%s",
             event.index,
             event.elapsed,
             event.luminance,

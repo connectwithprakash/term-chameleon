@@ -98,7 +98,7 @@ def _escape_applescript_string(text: str) -> str:
     Raises:
         ValueError: If the string contains newlines (not allowed in AppleScript strings)
     """
-    if '\n' in text or '\r' in text:
+    if "\n" in text or "\r" in text:
         raise ValueError(
             "AppleScript strings cannot contain newlines; "
             "split into multiple do script calls or strip newlines from the input string"

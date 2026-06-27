@@ -46,9 +46,7 @@ def read_png(path: str | Path) -> RasterImage:
     if interlace != 0:
         raise ValueError("interlaced PNG files are not supported")
     if width * height > MAX_PIXELS:
-        raise ValueError(
-            f"PNG dimensions {width}×{height} exceed the {MAX_PIXELS:,}-pixel limit"
-        )
+        raise ValueError(f"PNG dimensions {width}×{height} exceed the {MAX_PIXELS:,}-pixel limit")
     channels = _channels_for_color_type(color_type)
     # Bound decompression to the exact expected raw size so a decompression
     # bomb cannot expand the output beyond the bytes we are about to allocate.

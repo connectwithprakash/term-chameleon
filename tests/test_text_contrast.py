@@ -108,10 +108,22 @@ def test_background_fallback_uses_set_based_lookup():
     #   row 2: fg    bg    fg    bg    <- text band row
     #   row 3: gray  gray  gray  gray  <- outside band
     pixels = (
-        gray, gray, gray, gray,  # row 0
-        fg, bg, fg, bg,           # row 1
-        fg, bg, fg, bg,           # row 2
-        gray, gray, gray, gray,  # row 3
+        gray,
+        gray,
+        gray,
+        gray,  # row 0
+        fg,
+        bg,
+        fg,
+        bg,  # row 1
+        fg,
+        bg,
+        fg,
+        bg,  # row 2
+        gray,
+        gray,
+        gray,
+        gray,  # row 3
     )
     image = RasterImage(4, 4, pixels)
 
@@ -165,9 +177,7 @@ def test_estimate_raster_text_contrast_dark_text_on_light_background():
     light_bg = Color.from_hex("#E8E8E8")
 
     # 10 wide x 3 tall; 2 dark glyph pixels per row, 8 light background pixels per row.
-    pixels = tuple(
-        dark_glyph if x < 2 else light_bg for y in range(3) for x in range(10)
-    )
+    pixels = tuple(dark_glyph if x < 2 else light_bg for y in range(3) for x in range(10))
     image = RasterImage(10, 3, tuple(pixels))
 
     estimate = estimate_raster_text_contrast(

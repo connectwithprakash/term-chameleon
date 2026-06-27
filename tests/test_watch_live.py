@@ -462,9 +462,7 @@ def _pid_ownership_signal_helper(tmp_path, sig: int) -> None:
         with patch.object(_wl.os, "kill", lambda *_a, **_kw: None):
             handler(sig, None)
 
-        assert not pid_path.exists(), (
-            f"PID file was not removed by signal {sig} handler"
-        )
+        assert not pid_path.exists(), f"PID file was not removed by signal {sig} handler"
     finally:
         signal.signal(signal.SIGTERM, original_term)
         signal.signal(signal.SIGHUP, original_hup)

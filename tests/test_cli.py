@@ -8,6 +8,7 @@ FIXTURES = Path(__file__).parent / "fixtures" / "iterm"
 
 # --- Fix: release-check --live-stage requires --yes gate ---
 
+
 def test_release_check_live_stage_without_yes_returns_2(tmp_path, capsys):
     """release-check --live-stage returns exit 2 and refuses without --yes."""
     result = main(
@@ -28,6 +29,7 @@ def test_release_check_live_stage_without_yes_returns_2(tmp_path, capsys):
 
 
 # --- Fix: setup --no-live can override config live=true ---
+
 
 def test_setup_live_flag_defaults_to_none(tmp_path, capsys):
     """setup without --live/--no-live uses config value (config has live=false -> not live)."""
@@ -66,6 +68,7 @@ def test_setup_no_live_overrides_config_live_true(tmp_path, capsys):
 
 
 # --- Fix: watch-daemon-status --json includes 'healthy' field ---
+
 
 def test_watch_daemon_status_json_includes_healthy_field(tmp_path, capsys):
     """watch-daemon-status --json emits a 'healthy' key matching installed&&executable."""

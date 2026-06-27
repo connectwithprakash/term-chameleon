@@ -54,9 +54,7 @@ class Color:
 
     def to_hex(self) -> str:
         return (
-            f"#{_quantize_byte(self.r):02X}"
-            f"{_quantize_byte(self.g):02X}"
-            f"{_quantize_byte(self.b):02X}"
+            f"#{_quantize_byte(self.r):02X}{_quantize_byte(self.g):02X}{_quantize_byte(self.b):02X}"
         )
 
     def to_iterm_dict(self) -> dict[str, object]:
