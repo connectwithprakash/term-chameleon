@@ -1,0 +1,15 @@
+name = "adaptive-mode-selection"
+description = """
+A user wants to understand how the watcher would react as their window
+background changes from dark to bright. They simulate a sequence of sampled
+luminances and expect the risk classifier and mode selector to react sensibly
+(bright backgrounds flagged high-risk, dark ones low-risk).
+"""
+layer = "deterministic"
+
+[[steps]]
+name = "dark-to-bright sequence is classified by risk"
+run = "watch-sim 0.10 0.20 0.85 0.90"
+expect_exit = 0
+expect_stdout_contains = ["dark-low-risk", "bright-high-risk", "luminance="]
+expect_stdout_not_contains = ["Traceback"]

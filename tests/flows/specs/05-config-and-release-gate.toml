@@ -1,0 +1,29 @@
+name = "config-and-release-gate"
+description = """
+A user preparing to rely on term-chameleon validates a config file and runs the
+top-level release-readiness gate before trusting it. They expect the gate to be
+permission-free by default, to pass, and to write JSON/Markdown reports.
+"""
+layer = "deterministic"
+
+[[steps]]
+name = "an example config is generated and is valid TOML"
+run = "config-example --output {workdir}/config.toml"
+expect_exit = 0
+expect_artifact = ["{workdir}/config.toml"]
+
+[[steps]]
+name = "the generated config passes validation"
+run = "config-check --config {workdir}/config.toml"
+expect_exit = 0
+expect_stdout_not_contains = ["Traceback"]
+
+[[steps]]
+name = "the release gate passes and writes reports"
+run = "release-check --output-dir {workdir}/release"
+expect_exit = 0
+expect_artifact = [
+  "{workdir}/release/release-check-report.json",
+  "{workdir}/release/release-check-report.md",
+]
+expect_stdout_not_contains = ["Traceback"]

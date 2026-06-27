@@ -1,0 +1,24 @@
+name = "diagnose-bad-profile"
+description = """
+A user has a glass theme where ANSI black text vanishes and Light/Dark variants
+override their palette. They run the diagnostician on the profile and expect to
+be told exactly what is wrong, with actionable suggestions — not a stack trace.
+"""
+layer = "deterministic"
+
+[vars]
+bad_profile = "tests/fixtures/iterm/bad-ansi-black.json"
+good_profile = "tests/fixtures/iterm/good-dark-glass.json"
+
+[[steps]]
+name = "bad profile is flagged with failures"
+run = "doctor {bad_profile}"
+expect_exit = 1
+expect_stdout_contains = ["[fail]", "ITERM_LIGHT_DARK_DRIFT", "Suggestion:"]
+expect_stdout_not_contains = ["Traceback"]
+
+[[steps]]
+name = "good profile passes cleanly"
+run = "doctor {good_profile}"
+expect_exit = 0
+expect_stdout_not_contains = ["[fail]", "Traceback"]

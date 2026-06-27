@@ -1,0 +1,27 @@
+name = "cross-terminal-osc"
+description = """
+A user on a non-iTerm2 terminal (Kitty/Ghostty/Alacritty) wants readable colors
+without a Dynamic Profile. They inspect their terminal's capabilities and emit
+OSC color sequences for a preset, which work universally.
+"""
+layer = "deterministic"
+
+[[steps]]
+name = "terminal capabilities are reported"
+run = "terminal-info"
+expect_exit = 0
+expect_stdout_contains = ["Terminal:", "OSC sequences:"]
+expect_stdout_not_contains = ["Traceback"]
+
+[[steps]]
+name = "OSC sequences are emitted for a preset"
+run = "osc apply balanced"
+expect_exit = 0
+expect_stdout_contains = ["set default foreground", "set default background"]
+expect_stdout_not_contains = ["Traceback"]
+
+[[steps]]
+name = "reset sequences are available"
+run = "osc reset"
+expect_exit = 0
+expect_stdout_not_contains = ["Traceback"]

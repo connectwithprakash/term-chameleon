@@ -1,0 +1,29 @@
+name = "fix-bad-profile"
+description = """
+After diagnosing a broken profile, the user previews the conservative fix with
+--dry-run, then applies it with --yes. They expect a backup to be made, the
+changes to be explained, and the repaired profile to pass doctor afterwards.
+The tool must refuse to mutate the file without explicit --yes.
+"""
+layer = "deterministic"
+
+[vars]
+src = "tests/fixtures/iterm/bad-ansi-black.json"
+
+[[steps]]
+name = "stage a writable copy"
+run = "doctor {src}"
+expect_exit = 1
+
+[[steps]]
+name = "dry-run previews explained changes and writes nothing"
+run = "fix {src} --dry-run"
+expect_exit = 0
+expect_stdout_contains = ["Planned changes:", "reason:"]
+expect_stdout_not_contains = ["Traceback"]
+
+[[steps]]
+name = "fix without --yes refuses to mutate the file"
+run = "fix {src}"
+expect_exit = 2
+expect_stderr_contains = ["Refusing to write without --yes"]

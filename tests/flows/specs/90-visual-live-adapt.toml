@@ -1,0 +1,23 @@
+name = "visual-live-adapt-readable"
+description = """
+The end-to-end promise: with a real terminal open over a bright/gradient
+background, applying a readability preset should keep text legible on screen.
+This flow drives real iTerm2 via the Cua Driver, stages a controlled background,
+applies the balanced preset over OSC, captures the rendered window, and asserts
+the measured text/background contrast meets the WCAG AA threshold.
+
+Runs only under `--run-visual` on macOS with the Cua Driver installed; skipped
+cleanly otherwise.
+"""
+layer = "visual"
+requires = ["macos", "cua"]
+
+[[steps]]
+name = "balanced preset keeps text readable over a gradient background"
+[steps.visual]
+launch_app = "iTerm"
+type_text = "printf '\\033[37;40mTerm Chameleon readability sample line\\033[0m\\n'"
+background = "gradient"
+apply = "balanced"
+capture = "front-window"
+assert_contrast_at_least = 4.5

@@ -1,0 +1,21 @@
+name = "first-time-setup"
+description = """
+A new user installed term-chameleon and wants to know whether their terminal is
+set up for readable contrast. They check status and run the permission-free
+self-check, expecting clear, crash-free guidance.
+"""
+layer = "deterministic"
+
+[[steps]]
+name = "status is reported without crashing"
+run = "status --json"
+expect_exit = [0, 1]
+expect_stdout_contains = ["version", "checks"]
+expect_stdout_not_contains = ["Traceback"]
+
+[[steps]]
+name = "deterministic self-check passes and writes a report"
+run = "check --output-dir {workdir}/check"
+expect_exit = 0
+expect_stdout_contains = ["deterministic self-check passed"]
+expect_artifact = ["{workdir}/check/deterministic-check-report.json"]
