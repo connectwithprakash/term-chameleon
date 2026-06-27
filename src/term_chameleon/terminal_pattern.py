@@ -22,7 +22,12 @@ fi
 def write_pattern_script(path: str | Path) -> Path:
     target = Path(path)
     atomic_write_text(target, shell_script_content())
-    target.chmod(0o755)
+    try:
+        target.chmod(0o755)
+    except OSError as exc:
+        raise OSError(
+            f"script written to {target} but could not set executable bit: {exc}"
+        ) from exc
     return target
 
 

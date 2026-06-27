@@ -73,6 +73,65 @@ def test_iterm_stage_script_writes_pattern_command(tmp_path):
     assert "{10, 20, 310, 420}" in script
 
 
+def test_iterm_stage_script_escapes_double_quotes(tmp_path):
+    """Verify that double quotes in the path are properly escaped for AppleScript."""
+    from term_chameleon.live_stage import _escape_applescript_string
+
+    # Test that double quotes are escaped
+    escaped = _escape_applescript_string('hello "world"')
+    # The function escapes quotes with backslash (AppleScript requires \")
+    assert escaped == r'hello \"world\"'
+    # Verify the escaping prevents breaking out of the AppleScript string
+    assert 'hello \\\"world\\\"' in escaped or escaped == r'hello \"world\"'
+
+
+def test_iterm_stage_script_escapes_backslashes(tmp_path):
+    """Verify that backslashes in the path are properly escaped for AppleScript."""
+    from term_chameleon.live_stage import _escape_applescript_string
+
+    # Test that backslashes are escaped (important on Windows paths or shell escapes)
+    escaped = _escape_applescript_string('C:\\Users\\test')
+    assert escaped == 'C:\\\\Users\\\\test'
+
+
+def test_iterm_stage_script_rejects_injection_attempt(tmp_path):
+    """Verify that command injection attempts through quotes are neutralized."""
+    from term_chameleon.live_stage import _escape_applescript_string
+
+    # Attempt to break out of the string and inject AppleScript commands
+    injection = '" & activate & "echo'
+    escaped = _escape_applescript_string(injection)
+    # The quotes are escaped, making the injection harmless
+    assert escaped == '\\" & activate & \\"echo'
+
+
+def test_iterm_stage_script_rejects_newlines(tmp_path):
+    """Verify that newlines in paths raise an error (not allowed in AppleScript strings)."""
+    import pytest
+
+    from term_chameleon.live_stage import _escape_applescript_string
+
+    # Newlines are not allowed in AppleScript double-quoted strings
+    with pytest.raises(ValueError, match="cannot contain newlines"):
+        _escape_applescript_string("path\nwith\nnewlines")
+
+    with pytest.raises(ValueError, match="cannot contain newlines"):
+        _escape_applescript_string("path\rwith\rreturns")
+
+
+def test_escape_applescript_newline_error_message_does_not_reference_shlex():
+    """The newline error message must not reference shlex.quote (irrelevant to AppleScript)."""
+    import pytest
+
+    from term_chameleon.live_stage import _escape_applescript_string
+
+    with pytest.raises(ValueError) as exc_info:
+        _escape_applescript_string("text\nwith\nnewline")
+    assert "shlex" not in str(exc_info.value), (
+        "Error message must not reference shlex.quote (not an AppleScript function)"
+    )
+
+
 def test_run_live_stage_dry_run_writes_report(tmp_path):
     report = run_live_stage(tmp_path, dry_run=True, background="solid-dark")
     assert report.dry_run is True

@@ -36,9 +36,11 @@ def atomic_write_text(path: str | Path, content: str) -> None:
         with os.fdopen(fd, "w", encoding="utf-8") as handle:
             handle.write(content)
             handle.flush()
-            os.fsync(handle.fileno())
+            # fsync is a best-effort durability hint; not all filesystems support it.
+            with suppress(OSError):
+                os.fsync(handle.fileno())
         tmp.replace(target)
     except Exception:
-        with suppress(FileNotFoundError):
+        with suppress(OSError):
             tmp.unlink()
         raise

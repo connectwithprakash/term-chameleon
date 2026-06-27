@@ -19,6 +19,8 @@ def read_png(path: str | Path) -> RasterImage:
     idat_parts: list[bytes] = []
     for chunk_type, payload in chunks:
         if chunk_type == b"IHDR":
+            if len(payload) != 13:
+                raise ValueError(f"PNG IHDR chunk must be 13 bytes, got {len(payload)}")
             width, height, bit_depth, color_type, _compression, _filter, interlace = struct.unpack(
                 ">IIBBBBB", payload
             )
@@ -39,7 +41,10 @@ def read_png(path: str | Path) -> RasterImage:
     if interlace != 0:
         raise ValueError("interlaced PNG files are not supported")
     channels = _channels_for_color_type(color_type)
-    raw = zlib.decompress(b"".join(idat_parts))
+    try:
+        raw = zlib.decompress(b"".join(idat_parts))
+    except zlib.error as exc:
+        raise ValueError("corrupt PNG image data") from exc
     stride = width * channels
     rows = _unfilter_rows(raw, width=width, height=height, channels=channels)
     if len(rows) != height * stride:

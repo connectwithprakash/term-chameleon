@@ -1,6 +1,8 @@
+import sys
 from pathlib import Path
 
 from term_chameleon.cli import main
+from term_chameleon.watch import Sample
 from term_chameleon.watch_daemon import (
     get_watch_daemon_status,
     install_watch_autolaunch_script,
@@ -9,11 +11,12 @@ from term_chameleon.watch_daemon import (
     watch_autolaunch_script,
     watch_live_command,
 )
+from term_chameleon.watch_live import WatchLiveConfig, run_watch_live
 
 
 def test_watch_live_command_defaults_to_whole_screen():
-    command = watch_live_command(executable="/tmp/python", interval=1, stable=2, cooldown=3)
-    assert command[:4] == ("/tmp/python", "-m", "term_chameleon.cli", "watch-live")
+    command = watch_live_command(executable=sys.executable, interval=1, stable=2, cooldown=3)
+    assert command[:4] == (sys.executable, "-m", "term_chameleon.cli", "watch-live")
     assert "--yes" in command
     assert "--iterm-window" not in command
     assert "--region" not in command
@@ -21,12 +24,12 @@ def test_watch_live_command_defaults_to_whole_screen():
 
 
 def test_watch_live_command_supports_iterm_window_region_and_whole_screen():
-    iterm_command = watch_live_command(executable="python", iterm_window=True)
+    iterm_command = watch_live_command(executable=sys.executable, iterm_window=True)
     assert "--iterm-window" in iterm_command
-    region_command = watch_live_command(executable="python", region="1,2,3,4")
+    region_command = watch_live_command(executable=sys.executable, region="1,2,3,4")
     assert "--region" in region_command
     assert "--iterm-window" not in region_command
-    whole_command = watch_live_command(executable="python", iterm_window=False)
+    whole_command = watch_live_command(executable=sys.executable, iterm_window=False)
     assert "--iterm-window" not in whole_command
     assert "--region" not in whole_command
 
@@ -144,7 +147,7 @@ def test_install_watch_daemon_cli_dry_run(tmp_path, capsys):
                 "--autolaunch-dir",
                 str(tmp_path),
                 "--python",
-                "/tmp/python",
+                sys.executable,
                 "--interval",
                 "1",
                 "--stable",
@@ -170,7 +173,7 @@ def test_install_watch_daemon_cli_iterm_window_opt_in(tmp_path, capsys):
                 "--autolaunch-dir",
                 str(tmp_path),
                 "--python",
-                "/tmp/python",
+                sys.executable,
                 "--iterm-window",
                 "--dry-run",
             ]
@@ -215,3 +218,86 @@ def test_uninstall_watch_daemon_cli_removes(tmp_path, capsys):
 def test_uninstall_watch_daemon_cli_missing_returns_one(tmp_path, capsys):
     assert main(["uninstall-watch-daemon", "--autolaunch-dir", str(tmp_path)]) == 1
     assert "Not installed:" in capsys.readouterr().out
+
+
+class _FakeClock:
+    """Minimal fake clock for watch_live regression tests."""
+
+    def __init__(self) -> None:
+        self.now = 0.0
+
+    def __call__(self) -> float:
+        return self.now
+
+    def sleep(self, seconds: float) -> None:
+        self.now += seconds
+
+
+def test_cooldown_revert_preserves_candidate_state(tmp_path):
+    """Regression: after a cooldown-blocked switch, the debounce candidate count must
+    be preserved so the watcher switches to the new mode at the first sample after the
+    cooldown expires, not after re-accumulating ``stable`` samples from scratch.
+
+    Scenario (stable=2, cooldown=6, interval=2):
+      s1 (bright 0.80, t=0): candidate_count→1; no switch
+      s2 (bright 0.80, t=2): candidate_count→2 → switches to bright-safe;
+                               next_allowed_switch = 2+6 = 8
+      s3 (dark  0.20, t=4): candidate_count→1; switched=False (count<2)
+      s4 (dark  0.20, t=6): candidate_count→2 → switched=True, BUT 6<8 → cooldown block;
+                               with fix: candidate_count preserved at 1;
+                               without fix: candidate_count reset to 0
+      s5 (dark  0.20, t=8): cooldown has expired (8≥8)
+                               with fix: count→2 → switches immediately to dark-glass ✓
+                               without fix: count→1 → switched=False ✗ (one extra sample needed)
+    """
+    clock = _FakeClock()
+    bright = Sample(0.80)
+    dark = Sample(0.20)
+
+    sequence = [bright, bright, dark, dark, dark]
+
+    def provider(index: int, _output_dir: Path, _region):
+        return sequence[index - 1], f"s{index}"
+
+    events = run_watch_live(
+        WatchLiveConfig(
+            interval=2,
+            duration=9,
+            stable=2,
+            cooldown=6,
+            output_dir=tmp_path,
+            dry_run=True,
+            initial_mode="balanced",
+        ),
+        sample_provider=provider,
+        sleep=clock.sleep,
+        clock=clock,
+    )
+
+    assert len(events) == 5, f"expected 5 events, got {len(events)}: {events}"
+
+    # s1: accumulating candidate, no switch
+    assert events[0].mode == "balanced"
+    assert events[0].switched is False
+
+    # s2: candidate_count reaches stable=2 → first switch
+    assert events[1].mode == "bright-safe"
+    assert events[1].switched is True
+
+    # s3: first dark sample, candidate_count=1 (< stable=2), no switch
+    assert events[2].mode == "bright-safe"
+    assert events[2].switched is False
+
+    # s4: candidate_count=2 → would switch, but cooldown active → blocked
+    assert events[3].mode == "bright-safe"
+    assert events[3].switched is False
+    assert "cooldown active" in events[3].message
+
+    # s5: cooldown has just expired; because candidate state was preserved across
+    # the s4 revert, candidate_count re-accumulates to 2 and the switch fires here.
+    # Without the fix this event would be switched=False (only count=1 accumulated).
+    assert events[4].switched is True, (
+        "Expected switch at s5 (first sample after cooldown expiry) because the "
+        "candidate count should have been preserved by the cooldown revert fix."
+    )
+    assert events[4].mode == "dark-glass"

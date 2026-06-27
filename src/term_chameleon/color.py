@@ -30,12 +30,15 @@ class Color:
 
     @classmethod
     def from_iterm_dict(cls, value: dict[str, object]) -> Color:
-        return cls(
-            float(value.get("Red Component", 0.0)),
-            float(value.get("Green Component", 0.0)),
-            float(value.get("Blue Component", 0.0)),
-            float(value.get("Alpha Component", 1.0)),
-        )
+        try:
+            return cls(
+                float(value.get("Red Component", 0.0)),
+                float(value.get("Green Component", 0.0)),
+                float(value.get("Blue Component", 0.0)),
+                float(value.get("Alpha Component", 1.0)),
+            )
+        except TypeError as exc:
+            raise ValueError(f"invalid color component in iTerm dict: {exc}") from exc
 
     def to_hex(self) -> str:
         return f"#{round(self.r * 255):02X}{round(self.g * 255):02X}{round(self.b * 255):02X}"

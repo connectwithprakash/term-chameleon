@@ -59,3 +59,31 @@ def test_apply_osc_to_terminal_reset(capsys):
     apply_osc_to_terminal("balanced", reset=True)
     captured = capsys.readouterr()
     assert "\x1b]104" in captured.out
+
+
+def test_apply_osc_to_terminal_write_error():
+    """Test that OSError from stdout.write is properly raised."""
+    import pytest
+
+    with patch("sys.stdout") as mock_stdout:
+        mock_stdout.write.side_effect = OSError("pipe error")
+        with patch("term_chameleon.osc.sequences_for_preset") as mock_seqs:
+            mock_seqs.return_value = []
+            with pytest.raises(OSError) as exc_info:
+                apply_osc_to_terminal("balanced")
+    assert "Failed to write OSC sequences to terminal" in str(exc_info.value)
+    assert "pipe error" in str(exc_info.value)
+
+
+def test_apply_osc_to_terminal_flush_error():
+    """Test that OSError from stdout.flush is properly raised."""
+    import pytest
+
+    with patch("sys.stdout") as mock_stdout:
+        mock_stdout.flush.side_effect = OSError("flush error")
+        with patch("term_chameleon.osc.sequences_for_preset") as mock_seqs:
+            mock_seqs.return_value = []
+            with pytest.raises(OSError) as exc_info:
+                apply_osc_to_terminal("balanced")
+    assert "Failed to write OSC sequences to terminal" in str(exc_info.value)
+    assert "flush error" in str(exc_info.value)

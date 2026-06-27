@@ -9,6 +9,12 @@ from pathlib import Path
 from .install import DEFAULT_AUTOLAUNCH_DIR
 from .safe_io import atomic_write_text, backup_file
 
+
+class InvalidExecutableError(ValueError):
+    """Raised when a user-supplied executable path fails validation."""
+
+    pass
+
 WATCH_AUTOLAUNCH_FILENAME = "term_chameleon_watch_live.py"
 DEFAULT_LOG_PATH = Path.home() / "Library" / "Logs" / "term-chameleon-watch-live.log"
 DEFAULT_PID_PATH = (
@@ -65,6 +71,35 @@ def read_pid(path: Path) -> int | None:
         return None
 
 
+def validate_executable(executable: str) -> None:
+    """Validate a user-supplied executable path before subprocess execution.
+
+    Args:
+        executable: The executable path to validate.
+
+    Raises:
+        InvalidExecutableError: If the executable path is invalid or unsafe.
+    """
+    if not executable:
+        raise InvalidExecutableError("Executable path cannot be empty")
+
+    if any(char in executable for char in (";", "|", "&", "$", "`", "\n", "\r")):
+        raise InvalidExecutableError(
+            "Executable path contains shell metacharacters (disallowed)"
+        )
+
+    expanded = Path(executable).expanduser()
+
+    if not expanded.exists():
+        raise InvalidExecutableError(f"Executable path does not exist: {executable}")
+
+    if not expanded.is_file():
+        raise InvalidExecutableError(f"Executable path is not a file: {executable}")
+
+    if not os.access(expanded, os.X_OK):
+        raise InvalidExecutableError(f"Executable path is not executable: {executable}")
+
+
 def watch_live_command(
     *,
     executable: str | None = None,
@@ -76,8 +111,13 @@ def watch_live_command(
     iterm_window: bool = False,
     region: str | None = None,
 ) -> tuple[str, ...]:
+    resolved_executable = executable or sys.executable
+
+    if executable is not None:
+        validate_executable(executable)
+
     command = [
-        executable or sys.executable,
+        resolved_executable,
         "-m",
         "term_chameleon.cli",
         "watch-live",

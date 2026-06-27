@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from .color import Color
+from .safe_io import atomic_write_text
 
 COLOR_KEYS = [
     "Background Color",
@@ -49,7 +50,10 @@ class ItermProfile:
     def color(self, key: str) -> Color | None:
         value = self.profile.get(key)
         if isinstance(value, dict):
-            return Color.from_iterm_dict(value)
+            try:
+                return Color.from_iterm_dict(value)
+            except (ValueError, TypeError):
+                return None
         return None
 
     def set_color(self, key: str, color: Color) -> None:
@@ -67,7 +71,7 @@ class ItermProfile:
         target = path or self.path
         if target is None:
             raise ValueError("no path supplied")
-        target.write_text(dumps_document(self.document), encoding="utf-8")
+        atomic_write_text(target, dumps_document(self.document))
 
 
 def loads_document(text: str, path: Path | None = None) -> ItermProfile:

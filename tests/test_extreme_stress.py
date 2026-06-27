@@ -8,20 +8,18 @@ Run with: pytest tests/test_extreme_stress.py -v --tb=short
 
 import json
 import os
-import sys
 import threading
 import time
-from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import patch
 
 import pytest
 
 from term_chameleon.color import Color
 from term_chameleon.contrast import contrast_ratio
-from term_chameleon.images import Region, RasterImage, solid_image
+from term_chameleon.images import RasterImage, Region
 from term_chameleon.pixel_contrast import (
-    estimate_raster_contrast,
     ContrastEstimate,
+    estimate_raster_contrast,
 )
 from term_chameleon.terminal import detect_terminal
 
@@ -148,7 +146,8 @@ class TestPixelContrastExtremes:
 
     def test_estimate_contrast_invalid_percentile_zero(self):
         """Percentile must be > 0."""
-        # Note: percentile validation happens in estimate_image_contrast, not estimate_raster_contrast
+        # Note: percentile validation happens in estimate_image_contrast,
+        # not estimate_raster_contrast
         # So test that raster function handles edge case gracefully
         pixels = [Color(r=0.0, g=0.0, b=0.0), Color(r=1.0, g=1.0, b=1.0)]
         image = RasterImage(width=2, height=1, pixels=tuple(pixels))
@@ -210,7 +209,7 @@ class TestRegionBoundaries:
     def test_region_zero_dimensions(self):
         """Region with zero width or height (edge case)."""
         with pytest.raises(ValueError, match="region width/height must be positive"):
-            region = Region(x=0, y=0, width=0, height=0)
+            Region(x=0, y=0, width=0, height=0)
 
     def test_region_maximum_dimensions(self):
         """Region with very large dimensions."""
@@ -266,7 +265,11 @@ class TestConcurrencyStress:
         def create_colors():
             try:
                 for i in range(1000):
-                    color = Color(r=(i % 256)/255.0, g=((i * 2) % 256)/255.0, b=((i * 3) % 256)/255.0)
+                    color = Color(
+                        r=(i % 256) / 255.0,
+                        g=((i * 2) % 256) / 255.0,
+                        b=((i * 3) % 256) / 255.0,
+                    )
                     colors.append(color)
             except Exception as e:
                 errors.append(e)
@@ -406,7 +409,7 @@ class TestResourceExhaustion:
     def test_many_contrast_estimates(self):
         """Create many contrast estimates to stress memory."""
         estimates = []
-        for i in range(100):  # Reduced from 1000 for runtime
+        for _ in range(100):  # Reduced from 1000 for runtime
             pixels = [
                 Color(r=(j % 256)/255.0, g=((j * 2) % 256)/255.0, b=((j * 3) % 256)/255.0)
                 for j in range(1000)
@@ -448,7 +451,7 @@ class TestInvalidInputCombinations:
         ratio = contrast_ratio(color1, color2)
         assert ratio > 0
         assert ratio < float("inf")
-        assert not str(ratio).lower() == "nan"
+        assert str(ratio).lower() != "nan"
 
     def test_zero_pixel_percentile_rounding(self):
         """Percentile that rounds to exactly 0 pixels."""

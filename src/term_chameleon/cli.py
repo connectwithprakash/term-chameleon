@@ -580,11 +580,10 @@ def main(argv: list[str] | None = None) -> int:
                 dry_run=args.dry_run,
                 yes=args.yes,
             )
+        raise RuntimeError(f"unhandled command: {args.command!r}")
     except (ValueError, OSError, json.JSONDecodeError, RuntimeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
-    parser.error("unknown command")
-    return 2
 
 
 def _doctor(path: Path, *, json_output: bool = False) -> int:

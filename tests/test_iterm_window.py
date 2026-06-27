@@ -1,9 +1,12 @@
 import subprocess
 
+import pytest
+
 from term_chameleon.cli import main
 from term_chameleon.images import Region
 from term_chameleon.iterm_window import (
     WindowBoundsResult,
+    _desktop_bounds_points,
     _points_region_to_screenshot_pixels,
     _raw_iterm_window_bounds_points,
     get_iterm_window_bounds,
@@ -74,3 +77,25 @@ def test_iterm_window_bounds_cli_success(monkeypatch, capsys):
     )
     assert main(["iterm-window-bounds"]) == 0
     assert "1,2,3,4" in capsys.readouterr().out
+
+
+def test_desktop_bounds_points_raises_runtime_error_on_non_numeric_output(monkeypatch):
+    """_desktop_bounds_points raises RuntimeError (not bare ValueError) on bad Finder output."""
+
+    def fake_run(*_args, **_kwargs):
+        return subprocess.CompletedProcess(["osascript"], 0, "not, valid, numbers, here\n", "")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    with pytest.raises(RuntimeError, match="could not parse desktop bounds from Finder"):
+        _desktop_bounds_points()
+
+
+def test_desktop_bounds_points_propagates_finder_error(monkeypatch):
+    """A non-zero return code from Finder produces a RuntimeError with the raw message."""
+
+    def fake_run(*_args, **_kwargs):
+        return subprocess.CompletedProcess(["osascript"], 1, "", "Finder not running")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    with pytest.raises(RuntimeError, match="Finder not running"):
+        _desktop_bounds_points()

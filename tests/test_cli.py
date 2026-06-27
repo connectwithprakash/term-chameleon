@@ -53,3 +53,23 @@ def test_fix_dry_run(capsys):
     out = capsys.readouterr().out
     assert "Planned changes" in out
     assert "Use Separate Colors" in out
+
+
+def test_main_raises_runtime_error_for_unregistered_command(monkeypatch, capsys):
+    """main() must produce error exit (not hang/crash) when a registered command lacks a handler."""
+    import argparse
+
+    import term_chameleon.cli as cli_module
+
+    # Patch parse_args to inject a synthetic command name not in the if-chain
+    original_parse = argparse.ArgumentParser.parse_args
+
+    def fake_parse(self, args=None, namespace=None):
+        result = original_parse(self, ["doctor", str(FIXTURES / "good-dark-glass.json")])
+        result.command = "__unhandled_synthetic_command__"
+        return result
+
+    monkeypatch.setattr(argparse.ArgumentParser, "parse_args", fake_parse)
+    ret = cli_module.main(["doctor", str(FIXTURES / "good-dark-glass.json")])
+    assert ret == 2
+    assert "unhandled command" in capsys.readouterr().err

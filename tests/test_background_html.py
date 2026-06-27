@@ -1,3 +1,5 @@
+import pytest
+
 from term_chameleon.background_html import (
     BACKGROUND_CSS,
     render_background_html,
@@ -11,6 +13,12 @@ def test_render_background_html_contains_name_and_css():
     assert "solid-dark" in html
     assert "#050814" in html
     assert "term-chameleon background" in html
+
+
+def test_render_background_html_rejects_unknown_css():
+    """render_background_html raises ValueError for css_background outside BACKGROUND_CSS."""
+    with pytest.raises(ValueError, match="known BACKGROUND_CSS value"):
+        render_background_html("custom", "red")
 
 
 def test_write_background_html(tmp_path):

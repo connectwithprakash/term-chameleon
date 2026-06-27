@@ -152,6 +152,8 @@ def run_watch_live(
         _prune_artifacts(config.output_dir)
         previous_mode = selector.current_mode
         previous_last_switch_luminance = selector._last_switch_luminance
+        previous_candidate_mode = selector._candidate_mode
+        previous_candidate_count = selector._candidate_count
         mode, classification, switched = selector.observe(sample)
         candidate_mode = classification.mode
         applied = False
@@ -160,6 +162,8 @@ def run_watch_live(
         if switched and now < next_allowed_switch:
             selector.current_mode = previous_mode
             selector._last_switch_luminance = previous_last_switch_luminance
+            selector._candidate_mode = previous_candidate_mode
+            selector._candidate_count = previous_candidate_count
             switched = False
             mode = selector.current_mode
             message = f"cooldown active; next switch allowed in {next_allowed_switch - now:.1f}s"

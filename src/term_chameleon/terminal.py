@@ -8,7 +8,10 @@ session mutation is iTerm2-specific).
 from __future__ import annotations
 
 import os
+import sys
 from dataclasses import dataclass
+
+from .osc import reset_sequences, sequences_for_preset
 
 
 @dataclass(frozen=True)
@@ -38,7 +41,7 @@ def detect_terminal() -> TerminalInfo:
     ghostty_environ = os.environ.get("GHOSTTY_RESOURCES_DIR") is not None
 
     is_iterm2 = term_program == "iterm.app" or term_program == "iterm2"
-    is_kitty = term_program == "kitty" or "kitty" in term
+    is_kitty = term_program == "kitty" or term == "xterm-kitty" or term.startswith("xterm-kitty-")
     is_ghostty = ghostty_environ or term_program == "ghostty"
     is_alacritty = term_program == "alacritty"
 
@@ -69,15 +72,16 @@ def apply_osc_to_terminal(preset_name: str, *, reset: bool = False) -> bool:
 
     This works universally across iTerm2, Kitty, Ghostty, and Alacritty.
     Returns True if sequences were written to stdout.
+    Raises OSError if output to stdout fails.
     """
-    from .osc import reset_sequences, sequences_for_preset
-
     seqs = reset_sequences() if reset else sequences_for_preset(preset_name)
 
     # Write raw escape sequences directly to stdout.
     payload = "".join(s.sequence for s in seqs)
-    import sys
 
-    sys.stdout.write(payload)
-    sys.stdout.flush()
+    try:
+        sys.stdout.write(payload)
+        sys.stdout.flush()
+    except OSError as e:
+        raise OSError(f"Failed to write OSC sequences to terminal: {e}") from e
     return True

@@ -109,6 +109,10 @@ def image_stats(image: RasterImage, *, max_pixels: int | None = None) -> ImageSt
         if max_pixels <= 0:
             raise ValueError("max_pixels must be positive")
         if len(pixels) > max_pixels:
+            # sample_side^2 <= max_pixels (floor); ceil-steps ensure the sampled
+            # grid never exceeds max_pixels, so max_pixels is an upper bound.
+            # The actual sample count may be somewhat below max_pixels for images
+            # whose dimensions are not multiples of sample_side.
             sample_side = max(1, math.floor(math.sqrt(max_pixels)))
             step_x = max(1, math.ceil(image.width / sample_side))
             step_y = max(1, math.ceil(image.height / sample_side))

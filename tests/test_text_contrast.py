@@ -90,6 +90,48 @@ def test_write_text_contrast_report(tmp_path):
     assert estimate.passed is True
 
 
+def test_background_fallback_uses_set_based_lookup():
+    """Regression: background-pixel fallback must use O(1) set membership, not O(n) list scan.
+
+    When every band pixel is classified as glyph (both fg and bg are far from the
+    adaptive/median threshold), background_pixels from the band loop stays empty and
+    the fallback scans image.pixels.  The fallback should still correctly find
+    background pixels that live outside the bands.
+    """
+    fg = Color(1.0, 1.0, 1.0)  # white
+    bg = Color(0.0, 0.0, 0.0)  # black
+    gray = Color(0.5, 0.5, 0.5)  # mid-gray — only present outside the text band
+
+    # 4 wide x 4 high:
+    #   row 0: gray  gray  gray  gray  <- outside band
+    #   row 1: fg    bg    fg    bg    <- text band row (high row delta)
+    #   row 2: fg    bg    fg    bg    <- text band row
+    #   row 3: gray  gray  gray  gray  <- outside band
+    pixels = (
+        gray, gray, gray, gray,  # row 0
+        fg, bg, fg, bg,           # row 1
+        fg, bg, fg, bg,           # row 2
+        gray, gray, gray, gray,  # row 3
+    )
+    image = RasterImage(4, 4, pixels)
+
+    # With adaptive=False and glyph_delta=0.4:
+    #   band luminances: 0.0 (bg) and 1.0 (fg), median = 0.5
+    #   abs(1.0 - 0.5) = 0.5 >= 0.4 -> fg is glyph
+    #   abs(0.0 - 0.5) = 0.5 >= 0.4 -> bg is glyph
+    # => background_pixels from band loop is empty; fallback runs.
+    # Fallback: glyph_set = {fg, bg}; gray not in glyph_set -> 8 gray pixels = background.
+    estimate = estimate_raster_text_contrast(
+        image, min_row_delta=0.1, glyph_delta=0.4, adaptive=False
+    )
+
+    # 8 band pixels (all classified glyph), 8 gray pixels collected via fallback
+    assert estimate.glyph_pixels == 8
+    assert estimate.background_pixels == 8
+    # Background mean must be gray (the outside-band pixels), not black or white
+    assert estimate.background_color == "#808080"
+
+
 def test_screenshot_text_contrast_cli(tmp_path, capsys):
     path = write_ppm(tmp_path / "text.ppm", text_like_image())
     assert (

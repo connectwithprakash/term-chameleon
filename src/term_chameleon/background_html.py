@@ -21,6 +21,10 @@ class HtmlBackgroundArtifact:
 
 
 def render_background_html(name: str, css_background: str) -> str:
+    if css_background not in BACKGROUND_CSS.values():
+        raise ValueError(
+            f"css_background must be a known BACKGROUND_CSS value; got {css_background!r}"
+        )
     escaped_name = html.escape(name)
     escaped_background = css_background.replace("</", "<\\/")
     return f"""<!doctype html>

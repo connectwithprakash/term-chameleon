@@ -1,3 +1,7 @@
+from unittest.mock import patch
+
+import pytest
+
 from term_chameleon.cli import main
 from term_chameleon.terminal_pattern import (
     shell_script_content,
@@ -31,3 +35,17 @@ def test_pattern_script_cli(tmp_path, capsys):
     out = capsys.readouterr().out
     assert "generated ANSI terminal pattern artifacts" in out
     assert (tmp_path / "render-pattern.sh").exists()
+
+
+def test_write_pattern_script_chmod_oserror_raises_with_context(tmp_path):
+    """chmod failure after a successful write raises OSError with a clear message."""
+    dest = tmp_path / "render.sh"
+    with (
+        patch("pathlib.Path.chmod", side_effect=PermissionError("not allowed")),
+        pytest.raises(OSError) as exc_info,
+    ):
+        write_pattern_script(dest)
+    assert "script written to" in str(exc_info.value)
+    assert "executable bit" in str(exc_info.value)
+    # The file itself was written successfully before chmod was attempted
+    assert dest.exists()

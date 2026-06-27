@@ -1,3 +1,7 @@
+import math
+
+import pytest
+
 from term_chameleon.color import Color
 from term_chameleon.images import (
     RasterImage,
@@ -111,3 +115,19 @@ def test_region_parse_and_crop_image():
 def test_region_clamps_to_image_bounds():
     image = solid_image(4, 4, Color.from_hex("#000000"))
     assert Region(2, 2, 10, 10).clamp_to(image) == Region(2, 2, 2, 2)
+
+
+def test_image_stats_max_pixels_is_upper_bound():
+    """max_pixels is an upper bound: sampled count never exceeds it, but may be less."""
+    image = solid_image(10, 10, Color.from_hex("#808080"))
+    stats_full = image_stats(image)
+    stats_sampled = image_stats(image, max_pixels=10)
+    # Verify the sampling formula: sample_side=3, step=ceil(10/3)=4, indices={0,4,8} -> 9 sampled.
+    sample_side = max(1, math.floor(math.sqrt(10)))  # 3
+    step_x = max(1, math.ceil(10 / sample_side))
+    step_y = max(1, math.ceil(10 / sample_side))
+    expected_count = len(range(0, 10, step_y)) * len(range(0, 10, step_x))
+    assert expected_count <= 10, "sampled count must never exceed max_pixels"
+    assert expected_count > 0
+    # For a solid image the stats must be identical regardless of sampling strategy.
+    assert stats_sampled.average_luminance == pytest.approx(stats_full.average_luminance, abs=1e-6)

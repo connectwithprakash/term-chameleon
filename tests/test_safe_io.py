@@ -1,4 +1,4 @@
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -64,3 +64,48 @@ def test_backup_file_returns_path_for_missing_source(tmp_path):
     source = tmp_path / "nonexistent.json"
     backup = backup_file(source)
     assert not backup.exists()
+
+
+def test_atomic_write_text_fsync_oserror_does_not_abort_write(tmp_path):
+    """fsync failing with OSError (e.g. unsupported filesystem) must not abort the write."""
+    target = tmp_path / "out.json"
+    with patch("os.fsync", side_effect=OSError("fsync not supported")):
+        atomic_write_text(target, "content")
+    assert target.read_text(encoding="utf-8") == "content"
+
+
+def test_atomic_write_text_original_exception_preserved_when_cleanup_fails(tmp_path):
+    """When the write fails and tmp.unlink() also raises, the original write error propagates."""
+    target = tmp_path / "out.json"
+    original_error = OSError("disk full")
+
+    mock_path = MagicMock()
+    mock_path.parent = tmp_path
+    mock_path.name = "out.json"
+    mock_path.__str__ = lambda self: str(target)
+
+    # Simulate: fdopen succeeds, but something else raises original_error,
+    # and tmp.unlink() itself raises PermissionError.
+    with patch("os.fdopen", side_effect=original_error), pytest.raises(OSError) as exc_info:
+        atomic_write_text(target, "content")
+
+    # The raised exception must be the original disk-full error, not a cleanup error.
+    assert exc_info.value is original_error
+
+
+def test_atomic_write_text_suppress_broadened_to_oserror(tmp_path):
+    """cleanup suppress(OSError) catches PermissionError so the original error propagates."""
+    target = tmp_path / "out.json"
+    original_error = OSError("disk full")
+    cleanup_error = PermissionError("cannot unlink temp")
+
+    # Patch os.fdopen to raise, then patch Path.unlink to also raise
+    with (
+        patch("os.fdopen", side_effect=original_error),
+        patch("pathlib.Path.unlink", side_effect=cleanup_error),
+        pytest.raises(OSError) as exc_info,
+    ):
+        atomic_write_text(target, "content")
+
+    # The original error must be re-raised, not the cleanup PermissionError
+    assert exc_info.value is original_error

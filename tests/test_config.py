@@ -282,6 +282,19 @@ def test_install_watch_daemon_rejects_invalid_config_initial_mode(tmp_path, caps
     assert "unknown preset/mode" in capsys.readouterr().err
 
 
+def test_validate_preset_none_guard(monkeypatch):
+    """_validate_preset reports 'expected string' (not 'unknown preset None') when raw is None."""
+    from term_chameleon.config import _validate_preset
+
+    # Simulate a data dict where the key exists but raw value is None
+    # (not reachable from normal TOML, but validates the guard is consistent with _validate_region)
+    errors: list[str] = []
+    _validate_preset("watch", {"initial_mode": None}, "initial_mode", errors)
+    assert any("expected string" in e for e in errors), f"Expected 'expected string' in {errors}"
+    # Must NOT produce 'unknown preset/mode None' (the old misleading message)
+    assert not any("None" in e for e in errors), f"Got confusing None message in {errors}"
+
+
 def test_install_watch_daemon_uses_config_in_dry_run(tmp_path, capsys):
     config_path = tmp_path / "config.toml"
     config_path.write_text(

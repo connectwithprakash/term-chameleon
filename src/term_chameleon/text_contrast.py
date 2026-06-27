@@ -214,7 +214,8 @@ def estimate_raster_text_contrast(
             "text-like rows were found, but no glyph pixels passed glyph_delta"
         )
     if not background_pixels:
-        background_pixels = [pixel for pixel in image.pixels if pixel not in glyph_pixels]
+        glyph_set = set(glyph_pixels)
+        background_pixels = [pixel for pixel in image.pixels if pixel not in glyph_set]
     if not background_pixels:
         raise TextContrastUnavailable("could not identify background pixels")
 

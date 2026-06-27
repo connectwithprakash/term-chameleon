@@ -81,9 +81,38 @@ end tell
 '''
 
 
+def _escape_applescript_string(text: str) -> str:
+    """Escape a string for use in AppleScript double-quoted strings.
+
+    AppleScript requires:
+    - Double quotes to be escaped as \"
+    - Backslashes to be escaped as \\
+    - Newlines cannot appear in double-quoted strings (must use alternative quoting)
+
+    Args:
+        text: The string to escape
+
+    Returns:
+        The escaped string safe for use in AppleScript double-quoted strings
+
+    Raises:
+        ValueError: If the string contains newlines (not allowed in AppleScript strings)
+    """
+    if '\n' in text or '\r' in text:
+        raise ValueError(
+            "AppleScript strings cannot contain newlines; "
+            "split into multiple do script calls or strip newlines from the input string"
+        )
+    # Escape backslashes first (must be before quote escaping)
+    escaped = text.replace("\\", "\\\\")
+    # Then escape double quotes
+    escaped = escaped.replace('"', '\\"')
+    return escaped
+
+
 def iterm_stage_script(pattern_script: str | Path, *, bounds: str = DEFAULT_ITERM_BOUNDS) -> str:
     command = f"TERM_CHAMELEON_PATTERN_WAIT=0 {shlex.quote(str(Path(pattern_script).resolve()))}"
-    escaped = command.replace("\\", "\\\\").replace('"', '\\"')
+    escaped = _escape_applescript_string(command)
     return f'''tell application "iTerm2"
   activate
   set newWindow to (create window with default profile)

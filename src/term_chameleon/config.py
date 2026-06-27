@@ -307,6 +307,9 @@ def _validate_preset(section_name: str, data: Config, key: str, errors: list[str
     except ConfigError as exc:
         errors.append(f"[{section_name}].{key}: {exc}")
         return
+    if parsed is None:
+        errors.append(f"[{section_name}].{key}: expected string")
+        return
     if parsed not in PRESETS:
         errors.append(f"[{section_name}].{key}: unknown preset/mode {parsed!r}")
 

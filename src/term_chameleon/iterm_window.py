@@ -83,7 +83,10 @@ def _desktop_bounds_points() -> tuple[int, int, int, int]:
     raw = (completed.stdout or completed.stderr).strip()
     if completed.returncode != 0:
         raise RuntimeError(raw or "could not read desktop bounds")
-    parts = [int(part.strip()) for part in raw.split(",")]
+    try:
+        parts = [int(part.strip()) for part in raw.split(",")]
+    except ValueError as exc:
+        raise RuntimeError(f"could not parse desktop bounds from Finder: {raw!r}") from exc
     if len(parts) != 4:
         raise RuntimeError(f"unexpected desktop bounds: {raw}")
     return parts[0], parts[1], parts[2], parts[3]
