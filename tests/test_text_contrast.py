@@ -30,6 +30,23 @@ def test_detect_text_row_bands_finds_high_delta_rows():
     assert bands[0].height == 2
 
 
+def test_estimate_raster_text_contrast_adaptive_threshold():
+    """Otsu adaptive thresholding should separate fg/bg even with mid-tones."""
+    from term_chameleon.text_contrast import _otsu_threshold
+
+    # Two clear clusters: 0.0 and 1.0
+    values = [0.0, 0.0, 0.0, 1.0, 1.0, 1.0]
+    threshold = _otsu_threshold(values)
+    assert 0.0 < threshold < 1.0
+
+    estimate = estimate_raster_text_contrast(
+        text_like_image(), min_row_delta=0.2, glyph_delta=0.1, adaptive=True
+    )
+    assert estimate.foreground_color == "#FFFFFF"
+    assert estimate.background_color == "#000000"
+    assert estimate.glyph_pixels == 10
+
+
 def test_estimate_raster_text_contrast_detects_foreground_background():
     estimate = estimate_raster_text_contrast(text_like_image(), min_row_delta=0.2, glyph_delta=0.2)
     assert estimate.foreground_color == "#FFFFFF"

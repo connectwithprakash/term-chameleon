@@ -63,6 +63,44 @@ def _row_score(image: RasterImage, y: int) -> float:
     return max(values) - min(values)
 
 
+def _otsu_threshold(values: list[float]) -> float:
+    """Compute Otsu's threshold for a list of luminance values."""
+    if not values:
+        return 0.5
+    lo = min(values)
+    hi = max(values)
+    if hi - lo < 1e-6:
+        return lo
+    bins = 256
+    hist = [0] * bins
+    span = hi - lo
+    for v in values:
+        idx = min(bins - 1, int((v - lo) / span * bins))
+        hist[idx] += 1
+    total = len(values)
+    best_var = -1.0
+    best_t = lo
+    w0 = 0
+    sum0 = 0.0
+    sum_all = sum(lo + (i + 0.5) / bins * span for i, c in enumerate(hist) for _ in range(c))
+    for i in range(bins):
+        w0 += hist[i]
+        if w0 == 0:
+            continue
+        w1 = total - w0
+        if w1 == 0:
+            break
+        t_i = lo + (i + 0.5) / bins * span
+        sum0 += t_i * hist[i]
+        mean0 = sum0 / w0
+        mean1 = (sum_all - sum0) / w1
+        var_between = w0 * w1 * (mean0 - mean1) ** 2
+        if var_between > best_var:
+            best_var = var_between
+            best_t = t_i
+    return best_t
+
+
 def detect_text_row_bands(
     image: RasterImage,
     *,
@@ -125,6 +163,7 @@ def estimate_raster_text_contrast(
     threshold: float = 4.5,
     min_row_delta: float = 0.12,
     glyph_delta: float = 0.08,
+    adaptive: bool = True,
 ) -> TextContrastEstimate:
     if glyph_delta <= 0:
         raise ValueError("glyph_delta must be positive")
@@ -134,18 +173,36 @@ def estimate_raster_text_contrast(
             "no text-like rows found; lower --min-row-delta or provide a tighter --region"
         )
 
+    # Collect all band luminances for adaptive thresholding.
+    band_pixel_lists: list[list[Color]] = []
+    all_band_luminances: list[float] = []
+    for band in bands:
+        bp: list[Color] = []
+        for y in range(band.y, band.bottom):
+            bp.extend(_row_pixels(image, y))
+        band_pixel_lists.append(bp)
+        all_band_luminances.extend(p.relative_luminance() for p in bp)
+
+    # Use Otsu adaptive threshold when available; fall back to fixed glyph_delta.
+    if adaptive and all_band_luminances:
+        adaptive_t = _otsu_threshold(all_band_luminances)
+
+        def split_fn(lum: float) -> bool:
+            return abs(lum - adaptive_t) >= glyph_delta
+    else:
+        bg_median = median(all_band_luminances) if all_band_luminances else 0.5
+
+        def split_fn(lum: float) -> bool:
+            return abs(lum - bg_median) >= glyph_delta
+
     glyph_pixels: list[Color] = []
     background_pixels: list[Color] = []
     bands_with_counts: list[TextRowBand] = []
-    for band in bands:
-        band_pixels: list[Color] = []
-        for y in range(band.y, band.bottom):
-            band_pixels.extend(_row_pixels(image, y))
-        luminances = [pixel.relative_luminance() for pixel in band_pixels]
-        background_luminance = median(luminances)
+    for band, bp in zip(bands, band_pixel_lists, strict=True):
+        luminances = [pixel.relative_luminance() for pixel in bp]
         glyph_count = 0
-        for pixel in band_pixels:
-            if abs(pixel.relative_luminance() - background_luminance) >= glyph_delta:
+        for pixel, lum in zip(bp, luminances, strict=True):
+            if split_fn(lum):
                 glyph_pixels.append(pixel)
                 glyph_count += 1
             else:
