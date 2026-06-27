@@ -6,7 +6,7 @@ Glassy terminal themes look good until white text disappears over a bright windo
 
 ## Current status
 
-This repository is prepared as `v0.1.0` / Python package version `0.1.0`: a dogfooded beta for static profile diagnostics, safe profile mutation, deterministic visual artifacts, live iTerm2 adaptation, controlled macOS GUI/screenshot QA, and real iTerm2 AutoLaunch watcher operation. Implemented:
+This repository is prepared as `v0.1.1` / Python package version `0.1.1`: a dogfooded beta for static profile diagnostics, safe profile mutation, deterministic visual artifacts, live iTerm2 adaptation, controlled macOS GUI/screenshot QA, and real iTerm2 AutoLaunch watcher operation. Implemented:
 
 - iTerm2 Dynamic Profile JSON parsing.
 - Color conversion between hex and iTerm2 color dictionaries.
@@ -32,12 +32,15 @@ This repository is prepared as `v0.1.0` / Python package version `0.1.0`: a dogf
 - TOML config example, validation, and `--config` support for setup/watch-live/watch daemon flows.
 - Watch daemon status and uninstall commands for AutoLaunch lifecycle management.
 - Top-level release-readiness gate that composes deterministic checks, config validation, readiness, daemon, and live-stage checks.
+- Cross-terminal detection (`terminal-info`) and OSC color sequence application for iTerm2, Kitty, Ghostty, and Alacritty.
+- Adaptive Otsu thresholding for text-row glyph/background separation.
 - Fixture tests for good and bad iTerm2 profiles.
 
 Optional future refinements:
 
 - Replace heuristic text-row detection with OCR/terminal-cell-aware glyph segmentation.
-- Add broader terminal emulator support beyond iTerm2.
+- Live session mutation for Kitty/Ghostty (currently OSC-only for non-iTerm2 terminals).
+- PyPI publish via trusted publishing (requires pypi.org configuration).
 
 ## Beta release verification
 
@@ -46,7 +49,7 @@ Build and install the beta wheel locally:
 ```bash
 uv build
 python3 -m venv /tmp/term-chameleon-beta-venv
-/tmp/term-chameleon-beta-venv/bin/pip install 'dist/term_chameleon-0.1.0-py3-none-any.whl[iterm]'
+/tmp/term-chameleon-beta-venv/bin/pip install 'dist/term_chameleon-0.1.1-py3-none-any.whl[iterm]'
 /tmp/term-chameleon-beta-venv/bin/term-chameleon setup --yes
 /tmp/term-chameleon-beta-venv/bin/term-chameleon release-check --output-dir /tmp/term-chameleon-beta-release-check
 /tmp/term-chameleon-beta-venv/bin/term-chameleon release-check --output-dir /tmp/term-chameleon-beta-live-check --live --live-stage --threshold 1.0

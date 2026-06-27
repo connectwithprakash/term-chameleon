@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.1.1 - 2026-06-27
+
+### Added
+
+- Cross-terminal support: `terminal-info` command detects iTerm2, Kitty, Ghostty, and Alacritty.
+- `osc apply --write` writes raw OSC escape sequences to any OSC-capable terminal.
+- Adaptive Otsu thresholding for text-row glyph/background pixel separation.
+- Dedicated test suites for `osc.py` (8 tests) and `safe_io.py` (8 tests).
+- GitHub Actions CI (lint + test matrix: Ubuntu/macOS × Python 3.11/3.12/3.13).
+- GitHub Actions PyPI publish workflow (trusted publishing, pending pypi.org configuration).
+
+### Changed
+
+- Renamed `_setter_mappings` to `setter_mappings` (public API).
+- Narrowed `except Exception` to `except (KeyError, ValueError, TypeError)` in `fixes.py` and `modes.py`.
+- Replaced runtime `assert` with explicit `ConfigError` in daemon path resolution and config validation.
+- Added `help=` text to all key CLI arguments.
+- Made `release-check` status step pass on CI environments without iTerm2 installed.
+
 ## 0.1.0 - 2026-06-27
 
 ### Stable release
