@@ -19,6 +19,20 @@ class FakeClock:
         self.now += seconds
 
 
+def test_prune_artifacts_keeps_max_artifacts(tmp_path):
+    from term_chameleon.watch_live import WATCH_MAX_ARTIFACTS, _prune_artifacts
+
+    for i in range(WATCH_MAX_ARTIFACTS + 10):
+        (tmp_path / f"sample-{i:04d}.png").write_bytes(b"x")
+        (tmp_path / f"sample-{i:04d}-analysis.png").write_bytes(b"x")
+    _prune_artifacts(tmp_path)
+    remaining_screens = list(tmp_path.glob("sample-*.png"))
+    remaining_screens = [f for f in remaining_screens if "-analysis" not in f.name]
+    assert len(remaining_screens) <= WATCH_MAX_ARTIFACTS
+    remaining_analysis = list(tmp_path.glob("sample-*-analysis.png"))
+    assert len(remaining_analysis) <= WATCH_MAX_ARTIFACTS
+
+
 def test_analysis_image_path_uses_sips_downsample(monkeypatch, tmp_path):
     source = tmp_path / "sample-0001.png"
     source.write_bytes(b"fake-png")

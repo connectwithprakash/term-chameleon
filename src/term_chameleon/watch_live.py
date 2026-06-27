@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import shutil
 import subprocess
 import time
@@ -16,6 +17,7 @@ from .watch import ModeSelector, Sample
 
 WATCH_SAMPLE_MAX_PIXELS = 250_000
 WATCH_ANALYSIS_MAX_DIMENSION = 700
+WATCH_MAX_ARTIFACTS = 200
 
 
 @dataclass(frozen=True)
@@ -103,6 +105,21 @@ def _analysis_image_path(path: Path) -> Path:
     return target
 
 
+def _prune_artifacts(output_dir: Path, *, max_artifacts: int = WATCH_MAX_ARTIFACTS) -> None:
+    try:
+        files = sorted(output_dir.glob("sample-*.png"), key=lambda p: p.stat().st_mtime)
+    except OSError:
+        return
+    while len(files) > max_artifacts:
+        oldest = files.pop(0)
+        with contextlib.suppress(OSError):
+            oldest.unlink(missing_ok=True)
+        analysis = oldest.with_name(f"{oldest.stem}-analysis.png")
+        if analysis.exists():
+            with contextlib.suppress(OSError):
+                analysis.unlink()
+
+
 def run_watch_live(
     config: WatchLiveConfig,
     *,
@@ -132,6 +149,7 @@ def run_watch_live(
             break
         index += 1
         sample, source = sample_provider(index, config.output_dir, region)
+        _prune_artifacts(config.output_dir)
         previous_mode = selector.current_mode
         previous_last_switch_luminance = selector._last_switch_luminance
         mode, classification, switched = selector.observe(sample)

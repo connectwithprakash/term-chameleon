@@ -1305,11 +1305,11 @@ def _sample(
     region: str | None,
     iterm_window: bool,
 ) -> int:
+    if iterm_window and not screen:
+        raise ValueError("--iterm-window requires --screen; use --region for image files")
     resolved_region = resolve_region(
         Region.parse(region) if region else None, iterm_window=iterm_window
     )
-    if iterm_window and not screen:
-        raise ValueError("--iterm-window requires --screen; use --region for image files")
     decision = (
         decide_from_screen(output, region=resolved_region)
         if screen
@@ -1333,11 +1333,11 @@ def _adapt_once(
     if not dry_run and not yes:
         print("Refusing to write without --yes. Use --dry-run to preview.", file=sys.stderr)
         return 2
+    if iterm_window and not screen:
+        raise ValueError("--iterm-window requires --screen; use --region for image files")
     resolved_region = resolve_region(
         Region.parse(region) if region else None, iterm_window=iterm_window
     )
-    if iterm_window and not screen:
-        raise ValueError("--iterm-window requires --screen; use --region for image files")
     decision = (
         adapt_profile_from_screen(profile, output, region=resolved_region, dry_run=dry_run, yes=yes)
         if screen

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.0b4 - 2026-06-27
+
+### Fixed
+
+- `sample` and `adapt-once` now validate `--iterm-window requires --screen` before attempting to contact iTerm2.
+- Long-running watcher now prunes old screenshot artifacts to prevent unbounded disk growth (keeps the 200 most recent).
+
 ## 0.1.0b3 - 2026-06-25
 
 ### Fixed
