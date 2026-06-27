@@ -22,6 +22,12 @@ classifiers = [
 
 dependencies = []
 
+[project.urls]
+Homepage = "https://github.com/bodhi/term-chameleon"
+Repository = "https://github.com/bodhi/term-chameleon"
+Issues = "https://github.com/bodhi/term-chameleon/issues"
+Changelog = "https://github.com/bodhi/term-chameleon/blob/main/CHANGELOG.md"
+
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "ruff>=0.5"]
 iterm = ["iterm2>=2.9"]
