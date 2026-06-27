@@ -49,6 +49,6 @@ def _fmt(value) -> str:
 
         try:
             return Color.from_iterm_dict(value).to_hex()
-        except Exception:
+        except (KeyError, ValueError, TypeError):
             return "<color>"
     return repr(value)

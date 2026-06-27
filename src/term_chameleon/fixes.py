@@ -87,10 +87,10 @@ def fix_file(path: str | Path, *, dry_run: bool, yes: bool) -> tuple[list[Change
 
 def _format_value(value) -> str:
     if isinstance(value, dict):
-        try:
-            from .color import Color
+        from .color import Color
 
+        try:
             return Color.from_iterm_dict(value).to_hex()
-        except Exception:
+        except (KeyError, ValueError, TypeError):
             return "<color>"
     return repr(value)

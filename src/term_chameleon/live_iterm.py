@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .iterm_api import _setter_mappings
+from .iterm_api import setter_mappings
 from .presets import get_preset
 
 
@@ -54,7 +54,7 @@ def apply_preset_to_current_session(preset_name: str) -> LiveApplyResult:
             raise RuntimeError("no current iTerm2 session")
         session = window.current_tab.current_session
         change = iterm2.LocalWriteOnlyProfile()
-        for setter_name, value in _setter_mappings(preset):
+        for setter_name, value in setter_mappings(preset):
             maybe_set(change, setter_name, value)
         await session.async_set_profile_properties(change)
 

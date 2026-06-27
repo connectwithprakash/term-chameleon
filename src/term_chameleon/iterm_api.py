@@ -94,7 +94,7 @@ def write_live_adapter_script(path: str | Path, *, preset_name: str = "balanced"
 
 
 def live_adapter_setters() -> tuple[str, ...]:
-    return tuple(setter for setter, _value in _setter_mappings(get_preset("balanced")))
+    return tuple(setter for setter, _value in setter_mappings(get_preset("balanced")))
 
 
 def missing_live_adapter_setters() -> tuple[str, ...]:
@@ -108,7 +108,7 @@ def missing_live_adapter_setters() -> tuple[str, ...]:
 
 def _color_assignment_lines(preset: Preset) -> str:
     lines = []
-    for setter, value in _setter_mappings(preset):
+    for setter, value in setter_mappings(preset):
         if isinstance(value, str):
             lines.append(f'    maybe_set(change, "{setter}", color("{value}"))')
         else:
@@ -116,7 +116,7 @@ def _color_assignment_lines(preset: Preset) -> str:
     return "\n".join(lines)
 
 
-def _setter_mappings(preset: Preset) -> list[tuple[str, str | float | bool]]:
+def setter_mappings(preset: Preset) -> list[tuple[str, str | float | bool]]:
     return [
         ("set_background_color", preset.background.to_hex()),
         ("set_foreground_color", preset.foreground.to_hex()),
