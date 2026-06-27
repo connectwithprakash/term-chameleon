@@ -9,6 +9,11 @@ from .images import RasterImage
 
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 
+# Reject images whose total pixel count exceeds this limit.  A 4000×4000 RGB
+# image already decompresses to ~48 MB of raw scanline data; this constant
+# keeps both memory and CPU bounded on hostile or accidentally huge inputs.
+MAX_PIXELS = 4_000_000  # 4 MP ceiling (e.g. 2000×2000)
+
 
 def read_png(path: str | Path) -> RasterImage:
     data = Path(path).read_bytes()
@@ -40,11 +45,22 @@ def read_png(path: str | Path) -> RasterImage:
         raise ValueError(f"only 8-bit PNG files are supported, got bit depth {bit_depth}")
     if interlace != 0:
         raise ValueError("interlaced PNG files are not supported")
+    if width * height > MAX_PIXELS:
+        raise ValueError(
+            f"PNG dimensions {width}×{height} exceed the {MAX_PIXELS:,}-pixel limit"
+        )
     channels = _channels_for_color_type(color_type)
+    # Bound decompression to the exact expected raw size so a decompression
+    # bomb cannot expand the output beyond the bytes we are about to allocate.
+    max_raw = height * (1 + width * channels)
     try:
-        raw = zlib.decompress(b"".join(idat_parts))
+        raw = zlib.decompress(b"".join(idat_parts), wbits=15, bufsize=max_raw + 1)
     except zlib.error as exc:
         raise ValueError("corrupt PNG image data") from exc
+    if len(raw) > max_raw:
+        raise ValueError(
+            f"decompressed PNG data ({len(raw)} bytes) exceeds expected size ({max_raw} bytes)"
+        )
     stride = width * channels
     rows = _unfilter_rows(raw, width=width, height=height, channels=channels)
     if len(rows) != height * stride:

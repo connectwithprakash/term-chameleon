@@ -76,7 +76,25 @@ class ItermProfile:
             return True
 
     def set_color(self, key: str, color: Color) -> None:
-        self.profile[key] = color.to_iterm_dict()
+        """Write color into the profile, preserving Color Space and any unknown keys.
+
+        If the profile already contains a dict for ``key``, unknown keys (such
+        as the original "Color Space" value and any iTerm-specific extras) are
+        kept intact so that round-tripping a P3/wide-gamut profile does not
+        silently reinterpret the component values under a different gamut.
+        """
+        existing = self.profile.get(key)
+        base: dict[str, object] = dict(existing) if isinstance(existing, dict) else {}
+        # Merge only the four numeric component keys; let the existing Color Space
+        # and any other iTerm-specific keys remain unchanged.
+        new_dict = color.to_iterm_dict()
+        component_keys = ("Red Component", "Green Component", "Blue Component", "Alpha Component")
+        for k in component_keys:
+            base[k] = new_dict[k]
+        # For a new key with no prior dict, include the Color Space from to_iterm_dict.
+        if "Color Space" not in base:
+            base["Color Space"] = new_dict["Color Space"]
+        self.profile[key] = base
 
     def minimum_contrast(self) -> float | None:
         value = self.profile.get("Minimum Contrast")
@@ -95,6 +113,10 @@ class ItermProfile:
 
 def loads_document(text: str, path: Path | None = None) -> ItermProfile:
     document = json.loads(text)
+    if not isinstance(document, dict):
+        raise ValueError(
+            f"iTerm2 Dynamic Profile JSON root must be an object, got {type(document).__name__}"
+        )
     profiles = document.get("Profiles")
     if not isinstance(profiles, list) or not profiles:
         raise ValueError("iTerm2 Dynamic Profile JSON must contain non-empty Profiles list")
@@ -122,4 +144,7 @@ def color_hex(profile: dict[str, Any], key: str) -> str | None:
     value = profile.get(key)
     if not isinstance(value, dict):
         return None
-    return Color.from_iterm_dict(value).to_hex()
+    try:
+        return Color.from_iterm_dict(value).to_hex()
+    except (ValueError, TypeError):
+        return None

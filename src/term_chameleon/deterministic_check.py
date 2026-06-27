@@ -60,13 +60,6 @@ def run_deterministic_check(
     )
 
     e2e = run_e2e_stage(profile_path, out / "e2e-stage", capture=False, width=width, height=height)
-    try:
-        visual_data = json.loads(Path(e2e.visual_report_json).read_text(encoding="utf-8"))
-        visual_failures = [
-            item for item in visual_data if isinstance(item, dict) and not item.get("passed")
-        ]
-    except (FileNotFoundError, json.JSONDecodeError) as exc:
-        visual_failures = [{"passed": False, "error": str(exc)}]
     e2e_artifacts = [
         str(e2e.output_dir / "e2e-stage-report.json"),
         str(e2e.output_dir / "e2e-stage-report.md"),
@@ -76,10 +69,10 @@ def run_deterministic_check(
     steps.append(
         CheckStep(
             name="deterministic-e2e-stage",
-            passed=not visual_failures,
+            passed=e2e.passed,
             detail="background, ANSI pattern, visual, and screenshot-test artifacts generated"
-            if not visual_failures
-            else f"{len(visual_failures)} visual contrast check(s) failed",
+            if e2e.passed
+            else f"{e2e.visual_checks_failed} visual contrast check(s) failed",
             artifacts=e2e_artifacts,
         )
     )

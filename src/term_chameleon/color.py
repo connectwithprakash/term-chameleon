@@ -1,6 +1,12 @@
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
+
+
+def _quantize_byte(component: float) -> int:
+    """Round a [0, 1] float component to an 8-bit integer using round-half-up."""
+    return max(0, min(255, math.floor(component * 255 + 0.5)))
 
 
 @dataclass(frozen=True)
@@ -30,18 +36,28 @@ class Color:
 
     @classmethod
     def from_iterm_dict(cls, value: dict[str, object]) -> Color:
+        for required in ("Red Component", "Green Component", "Blue Component"):
+            if required not in value:
+                raise ValueError(
+                    f"color dict is missing required key {required!r}; "
+                    "expected Red, Green, and Blue Component"
+                )
         try:
             return cls(
-                float(value.get("Red Component", 0.0)),
-                float(value.get("Green Component", 0.0)),
-                float(value.get("Blue Component", 0.0)),
-                float(value.get("Alpha Component", 1.0)),
+                float(value["Red Component"]),  # type: ignore[arg-type]
+                float(value["Green Component"]),  # type: ignore[arg-type]
+                float(value["Blue Component"]),  # type: ignore[arg-type]
+                float(value.get("Alpha Component", 1.0)),  # type: ignore[arg-type]
             )
         except TypeError as exc:
             raise ValueError(f"invalid color component in iTerm dict: {exc}") from exc
 
     def to_hex(self) -> str:
-        return f"#{round(self.r * 255):02X}{round(self.g * 255):02X}{round(self.b * 255):02X}"
+        return (
+            f"#{_quantize_byte(self.r):02X}"
+            f"{_quantize_byte(self.g):02X}"
+            f"{_quantize_byte(self.b):02X}"
+        )
 
     def to_iterm_dict(self) -> dict[str, object]:
         return {

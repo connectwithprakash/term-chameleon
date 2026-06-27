@@ -175,3 +175,212 @@ def test_main_raises_runtime_error_for_unregistered_command(monkeypatch, capsys)
     ret = cli_module.main(["doctor", str(FIXTURES / "good-dark-glass.json")])
     assert ret == 2
     assert "unhandled command" in capsys.readouterr().err
+
+
+# --- Fix: install-watch-daemon validates resolved numeric values ---
+
+
+def test_install_watch_daemon_rejects_invalid_interval(tmp_path, capsys):
+    """install-watch-daemon --interval -1 must fail with error exit, not bake a broken command."""
+    result = main(
+        [
+            "install-watch-daemon",
+            "--dry-run",
+            "--interval",
+            "-1",
+            "--autolaunch-dir",
+            str(tmp_path),
+        ]
+    )
+    assert result == 2
+    assert "interval" in capsys.readouterr().err
+
+
+def test_install_watch_daemon_rejects_invalid_stable(tmp_path, capsys):
+    """install-watch-daemon --stable 0 must fail (stable must be >= 1)."""
+    result = main(
+        [
+            "install-watch-daemon",
+            "--dry-run",
+            "--stable",
+            "0",
+            "--autolaunch-dir",
+            str(tmp_path),
+        ]
+    )
+    assert result == 2
+    assert "stable" in capsys.readouterr().err
+
+
+def test_install_watch_daemon_rejects_invalid_cooldown(tmp_path, capsys):
+    """install-watch-daemon --cooldown -5 must fail (cooldown must be >= 0)."""
+    result = main(
+        [
+            "install-watch-daemon",
+            "--dry-run",
+            "--cooldown",
+            "-5",
+            "--autolaunch-dir",
+            str(tmp_path),
+        ]
+    )
+    assert result == 2
+    assert "cooldown" in capsys.readouterr().err
+
+
+def test_install_watch_daemon_rejects_invalid_region(tmp_path, capsys):
+    """install-watch-daemon --region with non-integer parts must fail validation."""
+    result = main(
+        [
+            "install-watch-daemon",
+            "--dry-run",
+            "--region",
+            "not,a,valid,region",
+            "--autolaunch-dir",
+            str(tmp_path),
+        ]
+    )
+    assert result == 2
+    assert "region" in capsys.readouterr().err.lower()
+
+
+def test_install_watch_daemon_valid_values_succeed(tmp_path, capsys):
+    """install-watch-daemon with valid params must succeed (dry-run)."""
+    result = main(
+        [
+            "install-watch-daemon",
+            "--dry-run",
+            "--interval",
+            "5",
+            "--stable",
+            "2",
+            "--cooldown",
+            "0",
+            "--autolaunch-dir",
+            str(tmp_path),
+        ]
+    )
+    assert result == 0
+    out = capsys.readouterr().out
+    assert "Would write" in out
+
+
+# --- Fix: watch-live --whole-screen overrides config iterm_window=true ---
+
+
+def test_watch_live_whole_screen_flag_accepted(monkeypatch, capsys):
+    """watch-live --whole-screen must be accepted as a valid flag (not 'unrecognized arguments')."""
+    import term_chameleon.cli as cli
+
+    def fake_run(config):
+        # Assert that whole-screen forced iterm_window=False and region=None
+        assert config.iterm_window is False
+        assert config.region is None
+        return []
+
+    monkeypatch.setattr(cli, "run_watch_live", fake_run)
+    result = main(["watch-live", "--dry-run", "--whole-screen"])
+    assert result == 0
+
+
+def test_watch_live_whole_screen_overrides_config_iterm_window(monkeypatch, tmp_path, capsys):
+    """watch-live --whole-screen forces iterm_window=False over config iterm_window=true."""
+    import term_chameleon.cli as cli
+
+    config = tmp_path / "cfg.toml"
+    config.write_text("[watch]\niterm_window = true\n", encoding="utf-8")
+
+    captured_configs = []
+
+    def fake_run(config_obj):
+        captured_configs.append(config_obj)
+        return []
+
+    monkeypatch.setattr(cli, "run_watch_live", fake_run)
+    result = main(
+        [
+            "watch-live",
+            "--dry-run",
+            "--whole-screen",
+            "--config",
+            str(config),
+        ]
+    )
+    assert result == 0
+    assert len(captured_configs) == 1
+    assert captured_configs[0].iterm_window is False
+    assert captured_configs[0].region is None
+
+
+def test_watch_live_iterm_window_config_without_override(monkeypatch, tmp_path, capsys):
+    """watch-live with config iterm_window=true and no CLI flag resolves iterm_window=True."""
+    import term_chameleon.cli as cli
+
+    config = tmp_path / "cfg.toml"
+    config.write_text("[watch]\niterm_window = true\n", encoding="utf-8")
+
+    captured_configs = []
+
+    def fake_run(config_obj):
+        captured_configs.append(config_obj)
+        return []
+
+    monkeypatch.setattr(cli, "run_watch_live", fake_run)
+    result = main(
+        [
+            "watch-live",
+            "--dry-run",
+            "--config",
+            str(config),
+        ]
+    )
+    assert result == 0
+    assert len(captured_configs) == 1
+    assert captured_configs[0].iterm_window is True
+
+
+# --- Fix: setup --name '' must not be silently replaced by config value ---
+
+
+def test_setup_name_explicit_none_uses_default(tmp_path):
+    """setup without --name and no config falls back to the hardcoded default."""
+    # Just verify it completes without raising; actual name value is internal to run_setup
+    result = main(
+        [
+            "setup",
+            "--output-dir",
+            str(tmp_path / "out"),
+        ]
+    )
+    assert result in (0, 1)
+
+
+def test_setup_name_empty_string_does_not_fall_back_to_config(monkeypatch, tmp_path):
+    """setup --name '' must pass an empty string through, not the config value."""
+    import term_chameleon.cli as cli
+
+    config = tmp_path / "cfg.toml"
+    config.write_text('[setup]\nname = "ConfigName"\n', encoding="utf-8")
+
+    captured_kwargs: list[dict] = []
+    original_run_setup = cli.run_setup
+
+    def fake_run_setup(**kwargs):
+        captured_kwargs.append(kwargs)
+        return original_run_setup(**kwargs)
+
+    monkeypatch.setattr(cli, "run_setup", fake_run_setup)
+    # --name '' passes an empty string explicitly; it must NOT fall back to "ConfigName"
+    main(
+        [
+            "setup",
+            "--name",
+            "",
+            "--config",
+            str(config),
+            "--output-dir",
+            str(tmp_path / "out"),
+        ]
+    )
+    assert len(captured_kwargs) == 1
+    assert captured_kwargs[0]["name"] == ""

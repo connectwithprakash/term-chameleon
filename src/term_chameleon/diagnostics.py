@@ -200,12 +200,13 @@ def _check_pair(
     foreground,
     background,
     threshold: float,
+    severity: Severity = FAIL,
 ) -> None:
     ratio = contrast_ratio(foreground, background)
     if ratio < threshold:
         diagnostics.append(
             Diagnostic(
-                FAIL if threshold >= 4.5 else WARN,
+                severity,
                 code,
                 f"{label} contrast is low ({format_ratio(ratio)} < {threshold:.1f}:1)",
                 f"{label} {foreground.to_hex()} against background {background.to_hex()} "

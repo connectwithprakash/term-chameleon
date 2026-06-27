@@ -105,3 +105,82 @@ def test_read_png_corrupt_idat_is_not_zlib_error(tmp_path):
     assert exc is not None
     assert isinstance(exc, ValueError), f"expected ValueError, got {type(exc)}"
     assert not isinstance(exc, zlib.error), "must not propagate raw zlib.error"
+
+
+# --- Dimension cap / decompression-bomb guard tests ---
+
+
+def test_read_png_rejects_oversized_dimensions(tmp_path):
+    """read_png raises ValueError when width*height exceeds MAX_PIXELS."""
+    from term_chameleon.png import MAX_PIXELS
+
+    # Build an IHDR whose declared dimensions would overflow MAX_PIXELS.
+    # We never produce IDAT because the check fires before decompression.
+    over_side = int(MAX_PIXELS**0.5) + 1  # e.g. 2001 for MAX_PIXELS=4_000_000
+    ihdr = struct.pack(">IIBBBBB", over_side, over_side, 8, 2, 0, 0, 0)
+    path = tmp_path / "bomb.png"
+    path.write_bytes(
+        b"\x89PNG\r\n\x1a\n"
+        + _chunk(b"IHDR", ihdr)
+        + _chunk(b"IDAT", zlib.compress(b"\x00"))
+        + _chunk(b"IEND", b"")
+    )
+    with pytest.raises(ValueError, match="exceed"):
+        read_png(path)
+
+
+def test_read_png_dimension_cap_is_value_error_not_memory_error(tmp_path):
+    """The dimension-cap rejection must surface as ValueError, not MemoryError."""
+    from term_chameleon.png import MAX_PIXELS
+
+    over_side = int(MAX_PIXELS**0.5) + 1
+    ihdr = struct.pack(">IIBBBBB", over_side, over_side, 8, 2, 0, 0, 0)
+    path = tmp_path / "bomb2.png"
+    path.write_bytes(
+        b"\x89PNG\r\n\x1a\n"
+        + _chunk(b"IHDR", ihdr)
+        + _chunk(b"IDAT", zlib.compress(b"\x00"))
+        + _chunk(b"IEND", b"")
+    )
+    exc = None
+    try:
+        read_png(path)
+    except Exception as e:
+        exc = e
+    assert exc is not None
+    assert isinstance(exc, ValueError), f"expected ValueError, got {type(exc)}"
+
+
+def test_read_png_accepts_image_at_max_pixels_boundary(tmp_path):
+    """An image exactly at MAX_PIXELS is accepted (boundary condition)."""
+    from term_chameleon.png import MAX_PIXELS
+
+    # Use a 1-row image whose width exactly equals MAX_PIXELS to hit the
+    # boundary without over-allocating.  Truecolor (3 bytes/pixel).
+    width = MAX_PIXELS
+    height = 1
+    row = bytes([0, 0, 0] * width)  # all-black
+    path = tmp_path / "boundary.png"
+    path.write_bytes(_png(width, height, 2, [row]))
+    image = read_png(path)
+    assert image.width == width
+    assert image.height == height
+    assert len(image.pixels) == MAX_PIXELS
+
+
+def test_read_png_decompression_bomb_rejected_even_below_pixel_cap(tmp_path):
+    """Decompression output exceeding the expected raw size is rejected."""
+    # Build a 1×1 truecolor PNG whose IDAT decompresses to far more bytes than
+    # the expected 1*(1+1*3)=4 raw bytes by padding the uncompressed stream.
+    ihdr = struct.pack(">IIBBBBB", 1, 1, 8, 2, 0, 0, 0)
+    # Oversized uncompressed payload: correct scanline + lots of extra zeros
+    oversized = b"\x00\x00\x00\x00" + b"\x00" * 1000
+    path = tmp_path / "oversize_idat.png"
+    path.write_bytes(
+        b"\x89PNG\r\n\x1a\n"
+        + _chunk(b"IHDR", ihdr)
+        + _chunk(b"IDAT", zlib.compress(oversized))
+        + _chunk(b"IEND", b"")
+    )
+    with pytest.raises(ValueError, match="decompressed PNG data"):
+        read_png(path)

@@ -290,6 +290,11 @@ def main(argv: list[str] | None = None) -> int:
     region_group.add_argument(
         "--iterm-window", action="store_true", help="Sample the front iTerm2 window bounds"
     )
+    region_group.add_argument(
+        "--whole-screen",
+        action="store_true",
+        help="Sample the whole screen instead of the iTerm window",
+    )
     watch_live.add_argument("--dry-run", action="store_true")
     watch_live.add_argument(
         "--yes", action="store_true", help="Actually mutate the current iTerm2 session"
@@ -510,6 +515,7 @@ def main(argv: list[str] | None = None) -> int:
                 initial_mode=args.initial_mode,
                 region=args.region,
                 iterm_window=args.iterm_window,
+                whole_screen=args.whole_screen,
                 dry_run=args.dry_run,
                 yes=args.yes,
                 config=args.config,
@@ -734,6 +740,18 @@ def _install_watch_daemon(
     )
     daemon_initial_mode = _preset_or_error(
         initial_mode or str_value(value(daemon_cfg, "initial_mode")), "balanced"
+    )
+    # Validate resolved numeric/region values using the same rules as WatchLiveConfig and
+    # Region.parse so the daemon installer never bakes a permanently-broken command.
+    # ValueError (and ConfigError, a subclass) propagates to the CLI error handler.
+    WatchLiveConfig(
+        interval=daemon_interval,
+        stable=daemon_stable,
+        cooldown=daemon_cooldown,
+        output_dir=daemon_output_dir,
+        initial_mode=daemon_initial_mode,
+        iterm_window=resolved_iterm_window and resolved_region is None,
+        region=Region.parse(resolved_region) if resolved_region is not None else None,
     )
     daemon_python = python_executable or str_value(value(daemon_cfg, "python")) or sys.executable
     command = watch_live_command(
@@ -1029,7 +1047,12 @@ def _setup(
         live=resolved_live,
         profile_path=profile or path_value(value(setup_cfg, "profile")),
         preset=preset or str_value(value(setup_cfg, "preset"), "balanced"),
-        name=name or str_value(value(setup_cfg, "name"), "Adaptive Glass Alpha"),
+        # Explicit None check: an empty string --name '' must not fall back to config/default.
+        name=(
+            name
+            if name is not None
+            else str_value(value(setup_cfg, "name"), "Adaptive Glass Alpha")
+        ),
     )
     print(f"Wrote: {output / 'deterministic-check-report.json'}")
     print(f"Wrote: {output / 'deterministic-check-report.md'}")
@@ -1105,6 +1128,7 @@ def _watch_live(
     dry_run: bool,
     yes: bool,
     config: Path | None,
+    whole_screen: bool = False,
 ) -> int:
     if not dry_run and not yes:
         print("Refusing to mutate iTerm2 without --yes. Use --dry-run to preview.", file=sys.stderr)
@@ -1115,6 +1139,10 @@ def _watch_live(
     if iterm_window:
         resolved_region = None
         resolved_iterm_window = True
+    elif whole_screen:
+        # Explicit CLI flag overrides config iterm_window=true -> force whole-screen sampling.
+        resolved_iterm_window = False
+        resolved_region = None
     else:
         resolved_iterm_window = bool_value(value(watch_cfg, "iterm_window"), False)
         if resolved_region is not None:

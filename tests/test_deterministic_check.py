@@ -50,3 +50,98 @@ def test_check_cli_returns_failure_when_step_fails(monkeypatch, tmp_path, capsys
     assert main(["check", "--output-dir", str(tmp_path), "--width", "32", "--height", "16"]) == 1
     out = capsys.readouterr().out
     assert "[fail] synthetic: expected failure" in out
+
+
+# --- delegation: deterministic_check delegates to e2e.passed / visual_checks_failed ---
+
+
+def test_deterministic_e2e_step_delegates_to_e2e_passed(monkeypatch, tmp_path):
+    """deterministic-e2e-stage step passed flag is sourced from e2e.passed, not re-parsed JSON."""
+    from term_chameleon import deterministic_check as dc_module
+    from term_chameleon.e2e_stage import E2EStageReport
+
+    e2e_out = tmp_path / "e2e-stage"
+    e2e_out.mkdir(parents=True)
+    fake_e2e = E2EStageReport(
+        output_dir=e2e_out,
+        background_files=[],
+        pattern_files=[],
+        visual_report_json=str(e2e_out / "visual-report.json"),
+        visual_report_md=str(e2e_out / "visual-report.md"),
+        screenshot_report_json=str(e2e_out / "screenshot-report.json"),
+        screenshot_report_md=str(e2e_out / "screenshot-report.md"),
+        screenshot_captured=None,
+        visual_checks_passed=False,
+        visual_checks_failed=3,
+    )
+    assert fake_e2e.passed is False  # sanity: passed delegates to visual_checks_passed
+
+    monkeypatch.setattr(dc_module, "run_e2e_stage", lambda *a, **kw: fake_e2e)
+
+    report = run_deterministic_check(tmp_path, width=32, height=16)
+    e2e_step = next(s for s in report.steps if s.name == "deterministic-e2e-stage")
+
+    assert e2e_step.passed is False
+    assert "3 visual contrast check(s) failed" in e2e_step.detail
+
+
+def test_deterministic_e2e_step_passes_when_e2e_passes(monkeypatch, tmp_path):
+    """deterministic-e2e-stage step passes when e2e.passed is True."""
+    from term_chameleon import deterministic_check as dc_module
+    from term_chameleon.e2e_stage import E2EStageReport
+
+    e2e_out = tmp_path / "e2e-stage"
+    e2e_out.mkdir(parents=True)
+    fake_e2e = E2EStageReport(
+        output_dir=e2e_out,
+        background_files=[],
+        pattern_files=[],
+        visual_report_json=str(e2e_out / "visual-report.json"),
+        visual_report_md=str(e2e_out / "visual-report.md"),
+        screenshot_report_json=str(e2e_out / "screenshot-report.json"),
+        screenshot_report_md=str(e2e_out / "screenshot-report.md"),
+        screenshot_captured=None,
+        visual_checks_passed=True,
+        visual_checks_failed=0,
+    )
+    assert fake_e2e.passed is True
+
+    monkeypatch.setattr(dc_module, "run_e2e_stage", lambda *a, **kw: fake_e2e)
+
+    report = run_deterministic_check(tmp_path, width=32, height=16)
+    e2e_step = next(s for s in report.steps if s.name == "deterministic-e2e-stage")
+
+    assert e2e_step.passed is True
+    assert "generated" in e2e_step.detail
+
+
+def test_deterministic_e2e_step_respects_screenshot_captured_false(monkeypatch, tmp_path):
+    """If screenshot_captured=False, e2e.passed is False and step fails (future-proof guard)."""
+    from term_chameleon import deterministic_check as dc_module
+    from term_chameleon.e2e_stage import E2EStageReport
+
+    e2e_out = tmp_path / "e2e-stage"
+    e2e_out.mkdir(parents=True)
+    # Simulate a future path where capture=True is wired and fails
+    fake_e2e = E2EStageReport(
+        output_dir=e2e_out,
+        background_files=[],
+        pattern_files=[],
+        visual_report_json=str(e2e_out / "visual-report.json"),
+        visual_report_md=str(e2e_out / "visual-report.md"),
+        screenshot_report_json=str(e2e_out / "screenshot-report.json"),
+        screenshot_report_md=str(e2e_out / "screenshot-report.md"),
+        screenshot_captured=False,   # capture was requested but failed
+        visual_checks_passed=True,   # visuals passed
+        visual_checks_failed=0,
+    )
+    # E2EStageReport.passed must be False because screenshot_captured=False
+    assert fake_e2e.passed is False
+
+    monkeypatch.setattr(dc_module, "run_e2e_stage", lambda *a, **kw: fake_e2e)
+
+    report = run_deterministic_check(tmp_path, width=32, height=16)
+    e2e_step = next(s for s in report.steps if s.name == "deterministic-e2e-stage")
+
+    # Because we delegate to e2e.passed, the step correctly surfaces the failure
+    assert e2e_step.passed is False

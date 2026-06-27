@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+
 from .color import Color
 
 
@@ -22,4 +24,11 @@ def contrast_ratio(foreground: Color, background: Color) -> float:
 
 
 def format_ratio(value: float) -> str:
-    return f"{value:.2f}:1"
+    """Format a contrast ratio for display, truncating toward the failing side.
+
+    Uses floor-to-2-decimals so a failing ratio never displays as >= the
+    threshold.  For example, 4.497 (which fails the 4.5:1 check) displays as
+    ``4.49:1``, not ``4.50:1``.
+    """
+    truncated = math.floor(value * 100) / 100
+    return f"{truncated:.2f}:1"
