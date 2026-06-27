@@ -177,11 +177,18 @@ def main(argv: list[str] | None = None) -> int:
     mode.add_argument("--dry-run", action="store_true", help="Preview without writing")
     mode.add_argument("--yes", action="store_true", help="Confirm writing to the profile file")
 
-    osc = sub.add_parser("osc", help="Print OSC color sequences for a preset")
+    osc = sub.add_parser("osc", help="Print or apply OSC color sequences for a preset")
     osc.add_argument("action", choices=["apply", "reset"])
     osc.add_argument("preset", nargs="?", choices=sorted(PRESETS), default="balanced")
-    osc.add_argument("--tmux", action="store_true")
+    osc.add_argument("--tmux", action="store_true", help="Wrap sequences for tmux DCS passthrough")
     osc.add_argument("--shell", action="store_true", help="Print shell-safe printf command")
+    osc.add_argument("--write", action="store_true", help="Write raw escape sequences to stdout")
+
+    terminal_info = sub.add_parser(
+        "terminal-info",
+        help="Detect the current terminal emulator and its capabilities",
+    )
+    terminal_info.add_argument("--json", action="store_true", help="Emit machine-readable JSON")
 
     visual = sub.add_parser("visual-test", help="Run deterministic visual contrast simulation")
     visual.add_argument("profile", type=Path)
@@ -438,7 +445,15 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "mode":
             return _mode(args.profile, args.preset, dry_run=args.dry_run, yes=args.yes)
         if args.command == "osc":
-            return _osc(args.action, args.preset, tmux=args.tmux, shell=args.shell)
+            return _osc(
+                args.action,
+                args.preset,
+                tmux=args.tmux,
+                shell=args.shell,
+                write=args.write,
+            )
+        if args.command == "terminal-info":
+            return _terminal_info(json_output=args.json)
         if args.command == "visual-test":
             return _visual_test(args.profile, args.output_dir)
         if args.command == "check":
@@ -837,7 +852,12 @@ def _mode(path: Path, preset: str, *, dry_run: bool, yes: bool) -> int:
     return _print_remaining_failures(remaining, "mode profile passes failure-level doctor checks")
 
 
-def _osc(action: str, preset: str, *, tmux: bool, shell: bool) -> int:
+def _osc(action: str, preset: str, *, tmux: bool, shell: bool, write: bool = False) -> int:
+    if write:
+        from .terminal import apply_osc_to_terminal
+
+        apply_osc_to_terminal(preset, reset=(action == "reset"))
+        return 0
     sequences = reset_sequences() if action == "reset" else sequences_for_preset(preset)
     if shell:
         print(shell_printf(sequences, tmux=tmux))
@@ -850,6 +870,36 @@ def _osc(action: str, preset: str, *, tmux: bool, shell: bool) -> int:
                 rendered = tmux_wrap(rendered)
             print(f"# {seq.description}")
             print(rendered.encode("unicode_escape").decode("ascii"))
+    return 0
+
+
+def _terminal_info(*, json_output: bool = False) -> int:
+    from .terminal import detect_terminal
+
+    info = detect_terminal()
+    if json_output:
+        import json
+
+        payload = {
+            "name": info.name,
+            "is_iterm2": info.is_iterm2,
+            "is_kitty": info.is_kitty,
+            "is_ghostty": info.is_ghostty,
+            "is_alacritty": info.is_alacritty,
+            "is_supported": info.is_supported,
+            "supports_osc": info.supports_osc,
+            "supports_live_session": info.supports_live_session,
+        }
+        print(json.dumps(payload, indent=2))
+    else:
+        print(f"Terminal: {info.name}")
+        print(f"Supported: {info.is_supported}")
+        print(f"OSC sequences: {info.supports_osc}")
+        print(f"Live session mutation: {info.supports_live_session}")
+        if info.is_iterm2:
+            print("  Use: term-chameleon watch-live --yes")
+        elif info.is_supported:
+            print("  Use: term-chameleon osc apply --write")
     return 0
 
 
