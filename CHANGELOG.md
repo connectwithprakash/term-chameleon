@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.2.0 - 2026-06-27
+
+### Added
+
+- `uninstall` command: removes the installed Dynamic Profile and the make-default
+  AutoLaunch script (with a backup), and reports the previously-default profile GUID.
+- `watch-live --whole-screen` flag so a config `iterm_window = true` can be overridden.
+- User-flow test suite (`tests/flows/`): declarative TOML specs run two ways — fast
+  deterministic CLI checks, and an opt-in visual layer that drives real iTerm2.
+- `SECURITY.md`, `CODE_OF_CONDUCT.md`, and `docs/README.md`.
+
+### Changed
+
+- Split the CLI into a `commands/` package; no source file exceeds ~610 lines.
+- README leads with a two-command quickstart.
+- A high-risk (washout) background switch now overrides the `watch-live` cooldown so a
+  needed mode switch is not swallowed; low/medium-risk transitions still respect it.
+- Diagnostics: ANSI-black, bright-black, and selection contrast deficits below 3.0:1 now
+  block `doctor`/`fix` (previously could only warn).
+- `contrast_ratio` composites translucent backgrounds; `set_color` preserves a non-sRGB
+  Color Space on round-trip.
+- Dropped the unused `[visual]` (pillow) optional dependency.
+
+### Fixed
+
+Resolved 87 issues found across five adversarial audit rounds, including: PNG/PPM decode
+crashes and a decompression-bomb cap; a live-apply timeout and event-loop fd leak in the
+watch daemon; the Otsu threshold returning the wrong class boundary; `e2e-stage` masking
+visual-check failures in its exit code; a secondary-monitor negative-origin crash in the
+window-bounds probe; PID-file leaks on SIGTERM; and the corrected `[project.urls]` owner.
+
 ## 0.1.1 - 2026-06-27
 
 ### Added
@@ -9,7 +40,7 @@
 - Adaptive Otsu thresholding for text-row glyph/background pixel separation.
 - Dedicated test suites for `osc.py` (8 tests) and `safe_io.py` (8 tests).
 - GitHub Actions CI (lint + test matrix: Ubuntu/macOS × Python 3.11/3.12/3.13).
-- GitHub Actions PyPI publish workflow (trusted publishing, pending pypi.org configuration).
+- GitHub Actions PyPI publish workflow (OIDC trusted publishing).
 
 ### Changed
 
