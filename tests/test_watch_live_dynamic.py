@@ -166,3 +166,48 @@ def test_demo_apply_preset_overrides_background_per_mode(monkeypatch):
     assert calls[1] == ("bright-safe", wl.DEMO_MODE_BACKGROUNDS["bright-safe"])
     # The two demo backgrounds are visibly different (dark vs light).
     assert wl.DEMO_MODE_BACKGROUNDS["dark-glass"] != wl.DEMO_MODE_BACKGROUNDS["bright-safe"]
+
+
+def test_demo_cycle_switches_with_default_stable(monkeypatch):
+    """Regression: `watch-live --demo-cycle` with NO --stable (default 3) must still
+    switch. The demo cycle holds each brightness for 2 samples, so the default
+    debounce previously suppressed every switch and the demo did nothing."""
+    from pathlib import Path
+
+    import term_chameleon.cli as cli_module
+    from term_chameleon.commands import watch as watch_cmd
+
+    applied: list[str] = []
+
+    def fake_run(config, *, sample_provider, apply_preset, **_kw):
+        # Run the provider+selector for real via the actual loop, capturing applies.
+        from term_chameleon.watch_live import run_watch_live
+
+        clk = _FakeClock()
+        return run_watch_live(
+            config,
+            sample_provider=sample_provider,
+            apply_preset=lambda m: applied.append(m) or apply_preset(m),
+            sleep=clk.sleep,
+            clock=clk,
+        )
+
+    monkeypatch.setattr(cli_module, "run_watch_live", fake_run)
+    # Invoke the command handler the way the CLI does, WITHOUT stable/cooldown.
+    rc = watch_cmd.watch_live(
+        interval=1,
+        duration=6,
+        stable=None,
+        cooldown=None,
+        output_dir=Path("/tmp"),
+        initial_mode=None,
+        region=None,
+        iterm_window=False,
+        dry_run=False,
+        yes=True,
+        config=None,
+        demo_cycle=True,
+    )
+    assert rc == 0
+    assert "dark-glass" in applied
+    assert "bright-safe" in applied

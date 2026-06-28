@@ -90,6 +90,15 @@ def watch_live(
     watch_cooldown = (
         cooldown if cooldown is not None else float_value(value(watch_cfg, "cooldown"), 10.0)
     )
+    # The demo cycle alternates brightness every two samples; the default stable=3
+    # debounce and 10s cooldown would suppress every switch, so the demo would do
+    # nothing visible. When the user did not pin them explicitly, make the demo
+    # switch on each phase. Explicit --stable / --cooldown still win.
+    if demo_cycle:
+        if stable is None:
+            watch_stable = 1
+        if cooldown is None:
+            watch_cooldown = 0.0
     watch_output_dir = output_dir or path_value(
         value(watch_cfg, "output_dir"), Path("artifacts/watch-live")
     )
