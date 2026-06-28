@@ -5,7 +5,7 @@ import json
 import sys
 from pathlib import Path
 
-from .commands import checks, imaging, live, profile, watch
+from .commands import checks, demo, imaging, live, profile, watch
 from .commands.watch import watch_live as _watch_live
 from .config import DEFAULT_CONFIG_PATH
 from .install import (
@@ -307,6 +307,11 @@ def main(argv: list[str] | None = None) -> int:
         "--output", type=Path, default=Path("artifacts/screenshot-probe/screen.png")
     )
 
+    sub.add_parser(
+        "demo",
+        help="Apply each readability preset to the live iTerm2 session in turn (watch it adapt)",
+    )
+
     screenshot_test = sub.add_parser(
         "screenshot-test",
         help="Generate controlled background artifacts and optionally capture a screenshot",
@@ -527,6 +532,8 @@ def main(argv: list[str] | None = None) -> int:
             return live.iterm_live_script(args.preset, output=args.output)
         if args.command == "screenshot-probe":
             return imaging.screenshot_probe(capture=args.capture, output=args.output)
+        if args.command == "demo":
+            return demo.demo()
         if args.command == "screenshot-test":
             return imaging.screenshot_test(
                 output_dir=args.output_dir,

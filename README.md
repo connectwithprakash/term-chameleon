@@ -56,6 +56,38 @@ decides when to switch modes, avoiding thrash on transient changes. On a switch 
 the preset to the live iTerm2 session-local profile — adjusting foreground colors and
 window transparency together — through the iTerm2 Python API.
 
+## See it work
+
+Quickest look — cycle the presets on your current terminal and watch the colors change:
+
+```bash
+term-chameleon demo
+```
+
+`demo` applies each preset to your live iTerm2 session in turn, pausing between each, so
+you can watch the foreground colors and transparency shift. Run it from a visible iTerm2
+window.
+
+To see the full glass effect — colors adapting to a background *behind* a translucent
+terminal:
+
+1. In iTerm2, select the installed "Adaptive Glass" profile (translucent), or set your
+   current profile's Transparency to about 30% with Blur on.
+2. Put a browser or document window behind the terminal so it shows through.
+3. Start the watcher and change what's behind the terminal:
+
+   ```bash
+   term-chameleon watch-live --yes --whole-screen --interval 2 --duration 120
+   ```
+
+   Switch the background between a bright white page and a dark one. The terminal's text
+   and transparency adjust to stay readable, and each decision prints as it happens.
+
+To capture a shareable clip, record that session with QuickTime (or Cmd-Shift-5). macOS
+only lets a screen recording capture the visible space, so recording is the reliable way
+to produce a demo image or GIF — the `demo` command intentionally does not screenshot for
+you (it would capture whatever else is on screen).
+
 ## Requirements
 
 - macOS with iTerm2 (for live adaptation and profile install)
