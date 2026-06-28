@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.1 - 2026-06-28
+
+### Fixed
+
+- Watch-daemon install/uninstall no longer leaves a `.backup` file in the iTerm2
+  AutoLaunch folder. iTerm2 runs every file there on launch, so the stray backup
+  produced a "There is no application set to open the document" dialog on every
+  launch. Backups now go to the term-chameleon app-state script-backups directory.
+
 ## 0.2.0 - 2026-06-27
 
 ### Added
