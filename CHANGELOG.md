@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.3.0 - 2026-06-28
+
+### Added
+
+- Calibrated glassiness ladder: presets are ordered most-translucent to opaque with a
+  test-enforced invariant (transparency non-increasing, minimum-contrast non-decreasing),
+  so the watcher steps toward opacity exactly as far as the backdrop demands.
+- "Only the default background uses transparency" is now applied by every preset, so a
+  bright/colored backdrop cannot bleed through a colored cell and bury its text while empty
+  space stays glassy. Wired through the profile dict, live setters, and the generated adapter.
+- Optional true-backdrop capture: `[sck]` extra (ScreenCaptureKit) captures the backdrop
+  excluding the terminal window for a more accurate adaptation decision; falls back to
+  `screencapture` automatically. New `backdrop-info` command reports the active backend.
+- docs/design-adaptive-readability.md: the design of record, including why true per-glyph
+  correction is impossible through terminal controls (a macOS composition limit) and the
+  worst-case-background strategy adopted instead.
+
+### Changed
+
+- Validated and locked down (tests) that a high-variance/colliding backdrop routes to the
+  high-blur homogenizing rung and overrides the cooldown for immediate readability.
+
 ## 0.2.2 - 2026-06-28
 
 ### Added

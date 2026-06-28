@@ -58,6 +58,39 @@ decides when to switch modes, avoiding thrash on transient changes. On a switch 
 the preset to the live iTerm2 session-local profile — adjusting foreground colors and
 window transparency together — through the iTerm2 Python API.
 
+The presets form a calibrated **glassiness ladder** (most-translucent to opaque): as a rung
+trades transparency for readability, it raises iTerm2's per-glyph Minimum Contrast and blur
+in step, so the watcher steps toward opacity exactly as far as a brighter or busier backdrop
+demands. A splotchy/high-variance backdrop (the case where a colored glyph can collide with a
+same-colored patch behind the glass) routes to a higher-blur rung that homogenizes the
+backdrop and drops transparency, and overrides the cooldown so readability is restored at
+once. Colored cell backgrounds are rendered opaque ("only the default background uses
+transparency") so a bright backdrop can't bleed through a colored cell and bury its text,
+while empty space stays glassy.
+
+### A note on what is and isn't possible
+
+True per-glyph correction — fixing each character against the exact pixels behind it — is not
+achievable through any terminal's controls: every lever (palette, transparency, blur) is a
+single window-wide value, and macOS owns the backdrop, so no app (including GPU-shader
+terminals) receives the see-through pixels. Term Chameleon therefore enforces a *worst-case*
+readable configuration with the levers it does have, rather than pretending to solve an
+unobservable per-pixel problem. See `docs/design-adaptive-readability.md` for the full
+reasoning.
+
+### Sampling accuracy (optional)
+
+By default the watcher samples via `screencapture`, which sees the already-composited screen.
+Installing the optional extra enables a more accurate true-backdrop capture that excludes the
+terminal window:
+
+```bash
+pip install 'term-chameleon[sck]'
+term-chameleon backdrop-info   # shows which backend is active
+```
+
+It falls back to `screencapture` automatically when unavailable, so the tool works either way.
+
 ## See it work
 
 Quickest look — cycle the presets on your current terminal and watch the colors change:
