@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.2.2 - 2026-06-28
+
+### Added
+
+- `watch-live --demo-cycle`: drives the real sample -> decide -> apply loop off a
+  repeating bright/dark cycle instead of the screen, so the terminal visibly
+  auto-adapts on a timer (for demos and validation). Applies an exaggerated
+  demo-only background per mode so the switch is obvious on an opaque window;
+  the real presets are unchanged.
+- `demo` command: applies each preset to the live session in turn so you can
+  watch the colors shift.
+- VHS-rendered CLI demo GIF (`demo/demo.gif`) embedded in the README, with a
+  workflow that regenerates it from `demo/demo.tape`.
+
+### Fixed
+
+- `watch-live --demo-cycle` did nothing under the default `stable=3` debounce:
+  the cycle alternates every two samples, so no switch ever reached the
+  three-consecutive threshold. Demo-cycle now defaults `stable=1` / `cooldown=0`
+  (explicit flags still win).
+
 ## 0.2.1 - 2026-06-28
 
 ### Fixed
