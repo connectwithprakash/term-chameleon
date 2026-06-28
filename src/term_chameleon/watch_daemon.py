@@ -18,9 +18,11 @@ class InvalidExecutableError(ValueError):
 
 WATCH_AUTOLAUNCH_FILENAME = "term_chameleon_watch_live.py"
 DEFAULT_LOG_PATH = Path.home() / "Library" / "Logs" / "term-chameleon-watch-live.log"
-DEFAULT_PID_PATH = (
-    Path.home() / "Library" / "Application Support" / "term-chameleon" / "watch-live.pid"
-)
+_APP_STATE_DIR = Path.home() / "Library" / "Application Support" / "term-chameleon"
+DEFAULT_PID_PATH = _APP_STATE_DIR / "watch-live.pid"
+# Backups of the AutoLaunch script must NOT stay in the AutoLaunch folder — iTerm2
+# runs every file there on launch, so a stray .backup file triggers an error dialog.
+SCRIPT_BACKUP_DIR = _APP_STATE_DIR / "script-backups"
 
 
 @dataclass(frozen=True)
@@ -235,7 +237,7 @@ def install_watch_autolaunch_script(
     if not dry_run:
         target.parent.mkdir(parents=True, exist_ok=True)
         if target.exists():
-            backup_file(target)
+            backup_file(target, dest_dir=SCRIPT_BACKUP_DIR)
         atomic_write_text(target, content)
         target.chmod(0o755)
     return WatchDaemonInstall(
@@ -280,7 +282,7 @@ def uninstall_watch_autolaunch_script(
     removed = target.exists()
     if removed and not dry_run:
         if backup:
-            backup_path = backup_file(target)
+            backup_path = backup_file(target, dest_dir=SCRIPT_BACKUP_DIR)
         target.unlink()
     return WatchDaemonUninstall(target=target, removed=removed, backup_path=backup_path)
 

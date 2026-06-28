@@ -12,26 +12,28 @@ from pathlib import Path
 MAX_BACKUPS: int = 5
 
 
-def unique_backup_path(path: str | Path) -> Path:
+def unique_backup_path(path: str | Path, *, dest_dir: Path | None = None) -> Path:
     source = Path(path)
+    parent = dest_dir if dest_dir is not None else source.parent
     stamp = datetime.now().strftime("%Y%m%dT%H%M%S.%f")
-    candidate = source.with_name(f"{source.name}.backup.{stamp}")
+    candidate = parent / f"{source.name}.backup.{stamp}"
     counter = 1
     while candidate.exists():
-        candidate = source.with_name(f"{source.name}.backup.{stamp}.{counter}")
+        candidate = parent / f"{source.name}.backup.{stamp}.{counter}"
         counter += 1
     return candidate
 
 
-def _prune_backups(source: Path, keep: int = MAX_BACKUPS) -> None:
+def _prune_backups(source: Path, keep: int = MAX_BACKUPS, *, dest_dir: Path | None = None) -> None:
     """Remove the oldest `<name>.backup.*` files, keeping the *keep* most recent.
 
     Collects (path, mtime) pairs inside a per-file try/except so that a
     concurrent pruner that already unlinked a globbed path does not raise
     FileNotFoundError (mirrors the race-safe pattern in _prune_artifacts).
     """
+    parent = dest_dir if dest_dir is not None else source.parent
     pairs: list[tuple[float, Path]] = []
-    for p in source.parent.glob(f"{source.name}.backup.*"):
+    for p in parent.glob(f"{source.name}.backup.*"):
         # File may vanish between glob and stat (concurrent pruner); skip it.
         with suppress(OSError):
             pairs.append((p.stat().st_mtime, p))
@@ -42,13 +44,20 @@ def _prune_backups(source: Path, keep: int = MAX_BACKUPS) -> None:
             old.unlink()
 
 
-def backup_file(path: str | Path, keep: int = MAX_BACKUPS) -> Path:
-    """Copy *path* to a timestamped backup and prune older backups beyond *keep*."""
+def backup_file(path: str | Path, keep: int = MAX_BACKUPS, *, dest_dir: Path | None = None) -> Path:
+    """Copy *path* to a timestamped backup and prune older backups beyond *keep*.
+
+    By default the backup is a sibling of *path*. Pass *dest_dir* to place
+    backups elsewhere — e.g. so a backup of a file inside a directory that another
+    program scans (the iTerm2 AutoLaunch folder) does not land back in that folder.
+    """
     source = Path(path)
-    backup = unique_backup_path(source)
+    if dest_dir is not None:
+        dest_dir.mkdir(parents=True, exist_ok=True)
+    backup = unique_backup_path(source, dest_dir=dest_dir)
     if source.exists():
         shutil.copy2(source, backup)
-    _prune_backups(source, keep=keep)
+    _prune_backups(source, keep=keep, dest_dir=dest_dir)
     return backup
 
 

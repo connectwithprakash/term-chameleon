@@ -91,6 +91,34 @@ def test_uninstall_watch_autolaunch_script_removes_with_backup(tmp_path):
     assert result.backup_path.exists()
 
 
+def test_backup_does_not_land_in_autolaunch_dir(tmp_path, monkeypatch):
+    """iTerm2 runs every file in AutoLaunch on launch, so a .backup file left there
+    triggers an error dialog. Backups must go to the app-state script-backups dir."""
+    import term_chameleon.watch_daemon as wd
+
+    backup_dir = tmp_path / "script-backups"
+    monkeypatch.setattr(wd, "SCRIPT_BACKUP_DIR", backup_dir)
+
+    install_watch_autolaunch_script(
+        target_dir=tmp_path,
+        command=("python", "-m", "term_chameleon.cli", "watch-live", "--yes"),
+        dry_run=False,
+    )
+    # Reinstall (creates a backup of the existing script) and uninstall (another backup).
+    install_watch_autolaunch_script(
+        target_dir=tmp_path,
+        command=("python", "-m", "term_chameleon.cli", "watch-live", "--yes"),
+        dry_run=False,
+    )
+    uninstall_watch_autolaunch_script(target_dir=tmp_path, dry_run=False, backup=True)
+
+    # No .backup files may remain in the AutoLaunch directory.
+    assert not list(tmp_path.glob("*.backup.*"))
+    # The backups live in the dedicated app-state dir instead.
+    assert backup_dir.exists()
+    assert list(backup_dir.glob("term_chameleon_watch_live.py.backup.*"))
+
+
 def test_uninstall_watch_autolaunch_script_dry_run(tmp_path):
     install_watch_autolaunch_script(
         target_dir=tmp_path,
