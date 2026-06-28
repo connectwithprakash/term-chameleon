@@ -23,6 +23,9 @@ from .watch import ModeSelector, Sample
 WATCH_SAMPLE_MAX_PIXELS = 250_000
 WATCH_ANALYSIS_MAX_DIMENSION = 700
 WATCH_MAX_ARTIFACTS = 200
+# Risk classifications where text is actively washing out; a switch into one of
+# these overrides the anti-thrash cooldown so readability is restored at once.
+HIGH_RISK = frozenset({"bright-high-risk", "high-variance-high-risk"})
 # Maximum events kept in memory for the return value (ring buffer).
 # The daemon runs indefinitely; storing all events would exhaust RAM.
 WATCH_MAX_EVENTS_BUFFER = 1000
@@ -228,7 +231,13 @@ def run_watch_live(
         applied = False
         message = source
 
-        if switched and now < next_allowed_switch:
+        # The cooldown prevents cosmetic flapping between similar modes, but a
+        # switch into a high-risk state is a readability emergency (text washing
+        # out over a bright or high-variance background) and overrides it.
+        cooldown_blocks = switched and now < next_allowed_switch
+        if cooldown_blocks and classification.risk in HIGH_RISK:
+            cooldown_blocks = False
+        if cooldown_blocks:
             selector.current_mode = previous_mode
             selector._last_switch_luminance = previous_last_switch_luminance
             selector._candidate_mode = previous_candidate_mode

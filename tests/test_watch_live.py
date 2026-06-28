@@ -268,6 +268,79 @@ def test_watch_live_applies_when_not_dry_run(tmp_path):
     assert events[0].applied is True
 
 
+def test_watch_live_high_risk_switch_overrides_cooldown(tmp_path):
+    """A bright-high-risk background must switch even while the cooldown from a
+    prior switch is still active; readability emergencies override anti-thrash."""
+    # 1: dark -> switch to dark-glass (starts the cooldown).
+    # 2: bright, still within the 100s cooldown -> must override and switch.
+    samples = [Sample(0.10), Sample(0.90)]
+    applied: list[str] = []
+
+    def provider(index: int, _output_dir: Path, _region):
+        return samples[index - 1], f"sample-{index}"
+
+    def apply(mode: str) -> LiveApplyResult:
+        applied.append(mode)
+        return LiveApplyResult(mode, True, ("set_transparency",), f"applied {mode}")
+
+    clock = FakeClock()
+    events = run_watch_live(
+        WatchLiveConfig(
+            interval=1,
+            duration=1,
+            stable=1,
+            cooldown=100,  # long cooldown the second switch must override
+            output_dir=tmp_path,
+            dry_run=False,
+            initial_mode="balanced",
+        ),
+        sample_provider=provider,
+        apply_preset=apply,
+        sleep=clock.sleep,
+        clock=clock,
+    )
+    assert applied == ["dark-glass", "bright-safe"]
+    assert events[1].switched is True
+    assert events[1].mode == "bright-safe"
+    assert "cooldown active" not in events[1].message
+
+
+def test_watch_live_low_risk_switch_still_respects_cooldown(tmp_path):
+    """A non-emergency switch (into a low-risk mode) is still held by the cooldown,
+    so the override is scoped to high-risk states only."""
+    # 1: bright -> switch to bright-safe (starts cooldown).
+    # 2: dark (low risk), within cooldown -> must be HELD, not switched.
+    samples = [Sample(0.90), Sample(0.10)]
+    applied: list[str] = []
+
+    def provider(index: int, _output_dir: Path, _region):
+        return samples[index - 1], f"sample-{index}"
+
+    def apply(mode: str) -> LiveApplyResult:
+        applied.append(mode)
+        return LiveApplyResult(mode, True, ("set_transparency",), f"applied {mode}")
+
+    clock = FakeClock()
+    events = run_watch_live(
+        WatchLiveConfig(
+            interval=1,
+            duration=1,
+            stable=1,
+            cooldown=100,
+            output_dir=tmp_path,
+            dry_run=False,
+            initial_mode="balanced",
+        ),
+        sample_provider=provider,
+        apply_preset=apply,
+        sleep=clock.sleep,
+        clock=clock,
+    )
+    assert applied == ["bright-safe"]
+    assert events[1].switched is False
+    assert "cooldown active" in events[1].message
+
+
 def test_watch_live_continues_when_live_apply_fails(tmp_path):
     samples = [Sample(0.8), Sample(0.8)]
     attempted = []
