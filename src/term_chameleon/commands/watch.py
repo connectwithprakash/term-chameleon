@@ -59,6 +59,7 @@ def watch_live(
     yes: bool,
     config: Path | None,
     whole_screen: bool = False,
+    demo_cycle: bool = False,
 ) -> int:
     from .. import cli
 
@@ -106,7 +107,12 @@ def watch_live(
         region=Region.parse(resolved_region) if resolved_region else None,
         iterm_window=resolved_iterm_window,
     )
-    events = cli.run_watch_live(config_obj)
+    if demo_cycle:
+        from ..watch_live import demo_cycle_sample_provider
+
+        events = cli.run_watch_live(config_obj, sample_provider=demo_cycle_sample_provider)
+    else:
+        events = cli.run_watch_live(config_obj)
     for event in events:
         marker = "switch" if event.switched else "hold"
         apply_marker = " applied" if event.applied else ""

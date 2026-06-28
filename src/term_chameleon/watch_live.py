@@ -99,6 +99,26 @@ def screenshot_sample_provider(
     ), f"{screenshot.output_path}{suffix}{analysis_suffix}"
 
 
+# A repeating bright/dark cycle used by the self-driving demo provider so the
+# watcher visibly switches modes on a timer without sampling the real screen.
+DEMO_CYCLE_LUMINANCES: tuple[float, ...] = (0.08, 0.08, 0.92, 0.92)
+
+
+def demo_cycle_sample_provider(
+    index: int, _output_dir: Path, _region: Region | None
+) -> tuple[Sample, str]:
+    """Return a scripted bright/dark luminance instead of sampling the screen.
+
+    Lets `watch-live --demo-cycle` drive the real sample -> decide -> apply loop
+    off a repeating brightness pattern, so the terminal recolors on its own and
+    the auto-adaptation can be screen-recorded without rigging a changing
+    background. index is 1-based.
+    """
+    luminance = DEMO_CYCLE_LUMINANCES[(index - 1) % len(DEMO_CYCLE_LUMINANCES)]
+    label = "bright" if luminance > 0.5 else "dark"
+    return Sample(luminance), f"demo-cycle {label} (lum={luminance:.2f})"
+
+
 def _analysis_image_path(path: Path) -> Path:
     sips = shutil.which("sips")
     if sips is None:

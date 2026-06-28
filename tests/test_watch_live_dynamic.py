@@ -13,7 +13,12 @@ from pathlib import Path
 
 from term_chameleon.live_iterm import LiveApplyResult
 from term_chameleon.watch import Sample
-from term_chameleon.watch_live import WatchLiveConfig, run_watch_live
+from term_chameleon.watch_live import (
+    DEMO_CYCLE_LUMINANCES,
+    WatchLiveConfig,
+    demo_cycle_sample_provider,
+    run_watch_live,
+)
 
 
 class _FakeClock:
@@ -100,3 +105,43 @@ def test_live_loop_handles_high_variance_background():
         clock=clock,
     )
     assert recorded == ["high-variance-safe"]
+
+
+def test_demo_cycle_provider_alternates_bright_and_dark():
+    """The demo-cycle provider returns a repeating bright/dark pattern by index."""
+    from pathlib import Path
+
+    seen = [demo_cycle_sample_provider(i, Path("/tmp"), None)[0].luminance for i in range(1, 9)]
+    # Two cycles of DEMO_CYCLE_LUMINANCES.
+    assert seen == list(DEMO_CYCLE_LUMINANCES) * 2
+    # It spans both a dark (<0.35) and a bright (>0.65) value so it forces switches.
+    assert min(seen) < 0.35
+    assert max(seen) > 0.65
+
+
+def test_demo_cycle_drives_real_loop_to_switch():
+    """watch-live's demo-cycle provider makes the real loop switch modes on a timer."""
+    from pathlib import Path
+
+    applied: list[str] = []
+    clock = _FakeClock()
+    run_watch_live(
+        WatchLiveConfig(
+            interval=1,
+            duration=4,
+            stable=1,
+            cooldown=0,
+            output_dir=Path("/tmp"),
+            dry_run=False,
+            initial_mode="balanced",
+        ),
+        sample_provider=demo_cycle_sample_provider,
+        apply_preset=lambda m: (applied.append(m), LiveApplyResult(m, True, (), m))[1],
+        sleep=clock.sleep,
+        clock=clock,
+    )
+    # Over a dark,dark,bright,bright,dark cycle it applies dark-glass then bright-safe
+    # then dark-glass again — visibly auto-adapting with no input.
+    assert "dark-glass" in applied
+    assert "bright-safe" in applied
+    assert applied.index("dark-glass") < applied.index("bright-safe")

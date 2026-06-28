@@ -70,6 +70,17 @@ term-chameleon demo
 you can watch the foreground colors and transparency shift. Run it from a visible iTerm2
 window.
 
+See the *automatic* adaptation — the terminal recoloring on its own, no typing — by
+driving the real watch loop off a repeating bright/dark cycle:
+
+```bash
+term-chameleon watch-live --yes --demo-cycle --interval 2 --duration 30
+```
+
+The terminal switches between dark-glass and bright-safe by itself on a timer. This is the
+same loop the installed daemon runs — except the daemon samples your real screen. To
+capture it, record the iTerm2 window with Cmd-Shift-5 while this runs.
+
 To see the full glass effect — colors adapting to a background *behind* a translucent
 terminal:
 

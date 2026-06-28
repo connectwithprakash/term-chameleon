@@ -288,6 +288,12 @@ def main(argv: list[str] | None = None) -> int:
     watch_live.add_argument(
         "--yes", action="store_true", help="Actually mutate the current iTerm2 session"
     )
+    watch_live.add_argument(
+        "--demo-cycle",
+        action="store_true",
+        help="Drive the loop off a repeating bright/dark cycle instead of the screen, "
+        "so the terminal visibly auto-adapts on a timer (for demos and validation)",
+    )
 
     sub.add_parser("iterm-api-check", help="Check local iTerm2 Python API readiness")
     sub.add_parser("iterm-connect-probe", help="Attempt to connect to the live iTerm2 Python API")
@@ -521,6 +527,7 @@ def main(argv: list[str] | None = None) -> int:
                 dry_run=args.dry_run,
                 yes=args.yes,
                 config=args.config,
+                demo_cycle=args.demo_cycle,
             )
         if args.command == "iterm-api-check":
             return live.iterm_api_check()
