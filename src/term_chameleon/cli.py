@@ -179,6 +179,12 @@ def main(argv: list[str] | None = None) -> int:
     )
     terminal_info.add_argument("--json", action="store_true", help="Emit machine-readable JSON")
 
+    backdrop_info = sub.add_parser(
+        "backdrop-info",
+        help="Show which backdrop-capture backend the watcher will use (screencapture / SCK)",
+    )
+    backdrop_info.add_argument("--json", action="store_true", help="Emit machine-readable JSON")
+
     visual = sub.add_parser("visual-test", help="Run deterministic visual contrast simulation")
     visual.add_argument("profile", type=Path)
     visual.add_argument("--output-dir", type=Path, default=Path("artifacts/visual-test"))
@@ -477,6 +483,8 @@ def main(argv: list[str] | None = None) -> int:
             )
         if args.command == "terminal-info":
             return live.terminal_info(json_output=args.json)
+        if args.command == "backdrop-info":
+            return live.backdrop_info(json_output=args.json)
         if args.command == "visual-test":
             return imaging.visual_test(args.profile, args.output_dir)
         if args.command == "check":

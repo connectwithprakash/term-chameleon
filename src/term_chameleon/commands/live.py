@@ -61,6 +61,37 @@ def terminal_info(*, json_output: bool = False) -> int:
     return 0
 
 
+def backdrop_info(*, json_output: bool = False) -> int:
+    """Report which backdrop-capture backend the watcher will use.
+
+    screencapturekit (when the optional 'sck' extra is installed) captures the true
+    backdrop behind the terminal; otherwise the built-in screencapture composite grab.
+    """
+    from ..backdrop import detect_backdrop_capability
+
+    cap = detect_backdrop_capability()
+    if json_output:
+        import json
+
+        print(
+            json.dumps(
+                {
+                    "backend": cap.backend,
+                    "sck_importable": cap.sck_importable,
+                    "reason": cap.reason,
+                },
+                indent=2,
+            )
+        )
+    else:
+        print(f"Backdrop backend: {cap.backend}")
+        print(f"ScreenCaptureKit available: {cap.sck_importable}")
+        print(f"Reason: {cap.reason}")
+        if not cap.sck_importable:
+            print("  For true-backdrop capture: pip install 'term-chameleon[sck]'")
+    return 0
+
+
 def iterm_api_check() -> int:
     from .. import cli
 

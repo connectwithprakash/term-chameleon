@@ -112,12 +112,22 @@ exclude-terminal capture so the global classifier samples the true backdrop, wei
 text sits. ~1 dep (pyobjc-framework-ScreenCaptureKit), ~100-200 lines, reuses the existing
 Screen Recording permission.
 
-DECISION REQUIRED before building Tier-1: on macOS Tahoe (26.x) a non-bundled pip CLI hits TCC
-error -3801 (Screen Recording), which forces shipping a signed/notarized `.app` bundle. This
-threatens the *current* screencapture approach too, so it must be confronted regardless — but
-it is a meaningful packaging change. Options: (a) ship a signed `.app`; (b) keep the CLI and
-document the Tahoe limitation; (c) gate SCK behind a capability check and fall back to
-screencapture. To be decided before Tier-1 lands.
+DECISION TAKEN (option c): SCK is gated behind a capability check and falls back to
+screencapture, so the tool stays zero-dependency and works everywhere; SCK is an opt-in
+`[sck]` extra that simply makes the adaptation decision more accurate where available. No
+forced `.app` bundle. On macOS Tahoe (26.x) a non-bundled CLI may be denied Screen Recording
+(TCC -3801); the capability path treats that as "SCK unavailable" and falls back rather than
+failing.
+
+SHIPPED in Tier-1 (this iteration): the capability-gated seam (`backdrop.py`), the `[sck]`
+optional dependency, and a `backdrop-info` diagnostic reporting the active backend. DEFERRED
+(documented follow-up, gated by the extra): the concrete pyobjc ScreenCaptureKit
+exclude-terminal capture implementation. Rationale, held to the no-overengineering bar: the
+SCK capture is research-grade (SCContentFilter + async stream + CMSampleBuffer plumbing),
+requires a heavy framework not in the zero-dep core, and cannot be exercised/verified on a
+machine without it (and may be TCC-blocked on Tahoe) — so shipping an untested heavyweight
+capture path now would be unverifiable code. The seam makes it adoptable later without
+touching the core.
 
 ## Rejected (do not re-propose)
 
