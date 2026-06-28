@@ -77,9 +77,12 @@ driving the real watch loop off a repeating bright/dark cycle:
 term-chameleon watch-live --yes --demo-cycle --interval 2 --duration 30
 ```
 
-The terminal switches between dark-glass and bright-safe by itself on a timer. This is the
-same loop the installed daemon runs — except the daemon samples your real screen. To
-capture it, record the iTerm2 window with Cmd-Shift-5 while this runs.
+The terminal switches modes by itself on a timer — this is the same sample → decide → apply
+loop the installed daemon runs, only the daemon samples your real screen. To make the switch
+obvious on an ordinary opaque window, `--demo-cycle` applies an exaggerated background per
+mode (dark for dark backgrounds, near-white for bright ones); the real presets keep a subtle
+dark background and adapt mainly through transparency, which only shows over a translucent
+window. Record the iTerm2 window with Cmd-Shift-5 while it runs to capture the clip.
 
 To see the full glass effect — colors adapting to a background *behind* a translucent
 terminal:

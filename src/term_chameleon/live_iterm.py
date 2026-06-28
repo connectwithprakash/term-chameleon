@@ -19,11 +19,18 @@ def apply_preset_to_current_session(
     preset_name: str,
     *,
     timeout: float = DEFAULT_APPLY_TIMEOUT,
+    background_override: str | None = None,
 ) -> LiveApplyResult:
     """Apply a preset to the current iTerm2 session-local profile.
 
     This mutates only the current session's LocalWriteOnlyProfile. It does not
     rewrite Dynamic Profile JSON or global iTerm2 preferences.
+
+    *background_override* replaces the preset's background color with the given
+    hex value. The real presets share a near-identical dark background and adapt
+    via transparency, which is invisible on an opaque window; the demo cycle uses
+    this override to make the switch obvious on screen. It is demo-only and never
+    changes what the real presets apply.
 
     Runs the iterm2 websocket call on a daemon thread bounded by *timeout*
     seconds so a hung or unresponsive iTerm2 daemon never blocks the
@@ -67,6 +74,8 @@ def apply_preset_to_current_session(
         session = window.current_tab.current_session
         change = iterm2.LocalWriteOnlyProfile()
         for setter_name, value in setter_mappings(preset):
+            if setter_name == "set_background_color" and background_override is not None:
+                value = background_override
             maybe_set(change, setter_name, value)
         await session.async_set_profile_properties(change)
 

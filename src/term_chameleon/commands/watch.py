@@ -108,9 +108,13 @@ def watch_live(
         iterm_window=resolved_iterm_window,
     )
     if demo_cycle:
-        from ..watch_live import demo_cycle_sample_provider
+        from ..watch_live import demo_apply_preset, demo_cycle_sample_provider
 
-        events = cli.run_watch_live(config_obj, sample_provider=demo_cycle_sample_provider)
+        events = cli.run_watch_live(
+            config_obj,
+            sample_provider=demo_cycle_sample_provider,
+            apply_preset=demo_apply_preset,
+        )
     else:
         events = cli.run_watch_live(config_obj)
     for event in events:

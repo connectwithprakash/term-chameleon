@@ -145,3 +145,24 @@ def test_demo_cycle_drives_real_loop_to_switch():
     assert "dark-glass" in applied
     assert "bright-safe" in applied
     assert applied.index("dark-glass") < applied.index("bright-safe")
+
+
+def test_demo_apply_preset_overrides_background_per_mode(monkeypatch):
+    """demo_apply_preset passes a distinct demo background override per mode."""
+    import term_chameleon.watch_live as wl
+
+    calls: list[tuple] = []
+
+    def fake_apply(preset_name, *, background_override=None, **_kw):
+        calls.append((preset_name, background_override))
+        return LiveApplyResult(preset_name, True, (), preset_name)
+
+    monkeypatch.setattr(wl, "apply_preset_to_current_session", fake_apply)
+
+    wl.demo_apply_preset("dark-glass")
+    wl.demo_apply_preset("bright-safe")
+
+    assert calls[0] == ("dark-glass", wl.DEMO_MODE_BACKGROUNDS["dark-glass"])
+    assert calls[1] == ("bright-safe", wl.DEMO_MODE_BACKGROUNDS["bright-safe"])
+    # The two demo backgrounds are visibly different (dark vs light).
+    assert wl.DEMO_MODE_BACKGROUNDS["dark-glass"] != wl.DEMO_MODE_BACKGROUNDS["bright-safe"]

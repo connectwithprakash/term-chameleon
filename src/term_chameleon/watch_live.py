@@ -103,6 +103,25 @@ def screenshot_sample_provider(
 # watcher visibly switches modes on a timer without sampling the real screen.
 DEMO_CYCLE_LUMINANCES: tuple[float, ...] = (0.08, 0.08, 0.92, 0.92)
 
+# Demo-only background tints, applied ONLY in --demo-cycle so the mode switch is
+# obvious on an opaque window. The real presets share a near-identical dark
+# background and adapt via transparency (invisible without a translucent window),
+# so these exaggerated colors exist purely to make the demo legible on screen.
+DEMO_MODE_BACKGROUNDS: dict[str, str] = {
+    "dark-glass": "#0A0E1A",
+    "balanced": "#1C1330",
+    "bright-safe": "#E8ECF2",
+    "high-variance-safe": "#3A2A12",
+    "accessibility": "#000000",
+}
+
+
+def demo_apply_preset(preset_name: str) -> LiveApplyResult:
+    """Apply a preset with an exaggerated demo background so the switch is visible."""
+    return apply_preset_to_current_session(
+        preset_name, background_override=DEMO_MODE_BACKGROUNDS.get(preset_name)
+    )
+
 
 def demo_cycle_sample_provider(
     index: int, _output_dir: Path, _region: Region | None
