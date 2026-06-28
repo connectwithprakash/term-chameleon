@@ -1,0 +1,38 @@
+name: Demo
+
+# Regenerate the README demo GIF from demo/demo.tape whenever the tape, the CLI,
+# or the presets change, plus on demand. Keeps the demo from drifting out of date.
+on:
+  push:
+    branches: [main]
+    paths:
+      - demo/demo.tape
+      - src/term_chameleon/**
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - name: Install term-chameleon on PATH
+        run: uv tool install .
+      - name: Render the tape
+        uses: charmbracelet/vhs-action@v2
+        with:
+          path: demo/demo.tape
+      - name: Commit the regenerated demo if it changed
+        run: |
+          if ! git diff --quiet -- demo/demo.gif demo/demo.mp4; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add demo/demo.gif demo/demo.mp4
+            git commit -m "chore: regenerate demo from demo/demo.tape"
+            git push
+          else
+            echo "demo unchanged"
+          fi

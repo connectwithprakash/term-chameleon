@@ -9,6 +9,8 @@ readability failures, and can watch your screen and adapt your terminal's colors
 transparency live as the background behind it changes. macOS + iTerm2 today; OSC color
 sequences work on Kitty, Ghostty, and Alacritty too.
 
+![Term Chameleon CLI demo](demo/demo.gif)
+
 ## Quickstart
 
 ```bash
