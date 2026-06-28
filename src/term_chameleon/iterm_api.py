@@ -132,4 +132,8 @@ def setter_mappings(preset: Preset) -> list[tuple[str, str | float | bool]]:
         ("set_blur", preset.blur),
         ("set_blur_radius", preset.blur_radius),
         ("set_minimum_contrast", preset.minimum_contrast),
+        (
+            "set_only_the_default_bg_color_uses_transparency",
+            preset.only_default_bg_transparent,
+        ),
     ]

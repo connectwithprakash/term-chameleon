@@ -22,6 +22,10 @@ class Preset:
     blur: bool
     blur_radius: int
     minimum_contrast: float
+    # Keep empty space glassy while colored (non-default-bg) cells render opaque,
+    # so a bright/colored backdrop cannot bleed through a colored cell and bury its
+    # text. Part of the worst-case-background readability strategy.
+    only_default_bg_transparent: bool = True
 
     def as_legacy_dict(self) -> dict[str, object]:
         return {
@@ -39,6 +43,7 @@ class Preset:
             "blur": self.blur,
             "blur_radius": self.blur_radius,
             "minimum_contrast": self.minimum_contrast,
+            "only_default_bg_transparent": self.only_default_bg_transparent,
         }
 
 
@@ -147,6 +152,22 @@ PRESETS: dict[str, Preset] = {
     ),
 }
 
+# The glassiness ladder: presets ordered most-translucent -> most-opaque. Each rung
+# trades transparency for readability headroom — as transparency drops, minimum
+# contrast rises and blur increases — so the watcher can step toward opacity exactly
+# as far as a brighter/colliding backdrop demands and no further. This ordering is
+# the auditable spine of the worst-case-background strategy; the invariant that
+# transparency is non-increasing while minimum-contrast is non-decreasing across the
+# ladder is enforced by tests.
+GLASSINESS_LADDER: tuple[str, ...] = (
+    "dark-glass",
+    "balanced",
+    "high-variance-safe",
+    "bright-safe",
+    "presentation",
+    "accessibility",
+)
+
 BALANCED = PRESETS["balanced"].as_legacy_dict()
 COLOR_FIELD_MAP = {
     "Background Color": "background",
@@ -181,3 +202,4 @@ def apply_preset_to_profile_dict(profile: dict, preset: Preset) -> None:
     profile["Blur"] = preset.blur
     profile["Blur Radius"] = preset.blur_radius
     profile["Minimum Contrast"] = preset.minimum_contrast
+    profile["Only The Default BG Color Uses Transparency"] = preset.only_default_bg_transparent
