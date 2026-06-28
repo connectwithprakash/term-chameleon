@@ -1,76 +1,69 @@
 # Term Chameleon
 
-Term Chameleon is an adaptive contrast/readability toolkit for translucent terminals, starting with iTerm2 on macOS.
+Keep terminal text readable on translucent ("glass") terminals, automatically.
 
-Glassy terminal themes look good until white text disappears over a bright window, black/dim text vanishes over dark blur, or iTerm2 Light/Dark profile variants silently override the intended palette. Term Chameleon provides static profile diagnostics/fixes plus live background-aware sampling, staging, and adaptation for iTerm2.
+Glassy terminal themes look great until white text disappears over a bright browser
+window behind them, dim text vanishes over a dark blur, or iTerm2's Light/Dark profile
+variants silently override your palette. Term Chameleon diagnoses and fixes those
+readability failures, and can watch your screen and adapt your terminal's colors and
+transparency live as the background behind it changes. macOS + iTerm2 today; OSC color
+sequences work on Kitty, Ghostty, and Alacritty too.
 
-## Current status
-
-This repository is `v0.1.1` / Python package version `0.1.1` (Production/Stable): a dogfooded stable release for static profile diagnostics, safe profile mutation, deterministic visual artifacts, live iTerm2 adaptation, controlled macOS GUI/screenshot QA, and real iTerm2 AutoLaunch watcher operation. Implemented:
-
-- iTerm2 Dynamic Profile JSON parsing.
-- Color conversion between hex and iTerm2 color dictionaries.
-- WCAG contrast calculations.
-- Static diagnostics for common glass-terminal readability failures.
-- Conservative static fixer with dry-run, backups, deterministic JSON, and explainable changes.
-- iTerm2 Dynamic Profile preset install flow, including optional AutoLaunch default-profile script.
-- Manual readability mode switching for profile JSON files.
-- OSC color sequence generation, including tmux passthrough wrapping.
-- Dynamic watcher foundation via `watch-sim` risk classifier and hysteresis mode selector.
-- iTerm2 live-adapter script generation/probe foundation for session-local Python API validation.
-- Screen/image sampling one-shot adaptation via `sample` and `adapt-once`.
-- Live adaptive watcher via `watch-live`, with dry-run, stable-sample, cooldown, duration, and real iTerm2 session-local apply modes.
-- Deterministic E2E staging bundle that combines controlled backgrounds, ANSI pattern artifacts, visual simulation, screenshot capture, and screenshot pixel analysis.
-- Screenshot contrast estimation for captured PNG/PPM artifacts.
-- Text-row/glyph-aware screenshot contrast estimation for rendered terminal pattern captures.
-- Live GUI staging that arranges controlled Safari background + iTerm2 ANSI pattern windows and can optionally capture/analyze the result with text-row contrast and pixel-cluster fallback.
-- macOS `screencapture` probe and screenshot-test artifact foundation for screenshot-based visual tests.
-- Long-running daemon packaging for continuous adaptation.
-- Permission-free deterministic self-check command for post-install validation.
-- Local readiness status command with human and JSON output.
-- Guided setup command that runs deterministic checks and optionally installs the default profile.
-- TOML config example, validation, and `--config` support for setup/watch-live/watch daemon flows.
-- Watch daemon status and uninstall commands for AutoLaunch lifecycle management.
-- Top-level release-readiness gate that composes deterministic checks, config validation, readiness, daemon, and live-stage checks.
-- Cross-terminal detection (`terminal-info`) and OSC color sequence application for iTerm2, Kitty, Ghostty, and Alacritty.
-- Adaptive Otsu thresholding for text-row glyph/background separation.
-- Fixture tests for good and bad iTerm2 profiles.
-
-Optional future refinements:
-
-- Replace heuristic text-row detection with OCR/terminal-cell-aware glyph segmentation.
-- Live session mutation for Kitty/Ghostty (currently OSC-only for non-iTerm2 terminals).
-- PyPI publish via trusted publishing (requires pypi.org configuration).
-
-## Release verification
-
-Build and install the stable wheel locally:
+## Quickstart
 
 ```bash
-uv build
-python3 -m venv /tmp/term-chameleon-venv
-/tmp/term-chameleon-venv/bin/pip install 'dist/term_chameleon-0.1.1-py3-none-any.whl[iterm]'
-/tmp/term-chameleon-venv/bin/term-chameleon setup --yes
-/tmp/term-chameleon-venv/bin/term-chameleon release-check --output-dir /tmp/term-chameleon-release-check
-/tmp/term-chameleon-venv/bin/term-chameleon release-check --output-dir /tmp/term-chameleon-live-check --live --live-stage --threshold 1.0
+pip install 'term-chameleon[iterm]'
+term-chameleon setup --yes
 ```
 
-The real iTerm2 AutoLaunch watcher was dogfooded by installing the daemon, restarting iTerm2, verifying a single running watcher process, checking daemon status, and confirming screenshot sample artifacts were written.
+`setup --yes` runs a permission-free self-check and installs the adaptive "Glass" profile
+into iTerm2. Select that profile in iTerm2 and you have a tuned, readable glass terminal.
 
-See [CHANGELOG.md](CHANGELOG.md) for release notes.
-
-## Use it
+Want it to adapt automatically as your background changes? Install the watcher:
 
 ```bash
-python3 -m venv ~/.local/share/term-chameleon/venv
-~/.local/share/term-chameleon/venv/bin/pip install 'term-chameleon[iterm]'
-~/.local/share/term-chameleon/venv/bin/term-chameleon setup --yes
-~/.local/share/term-chameleon/venv/bin/term-chameleon release-check --live --live-stage --threshold 1.0
-~/.local/share/term-chameleon/venv/bin/term-chameleon install-watch-daemon
-~/.local/share/term-chameleon/venv/bin/term-chameleon watch-daemon-status
+term-chameleon install-watch-daemon
 ```
 
-Restart iTerm2 after installing the daemon. The AutoLaunch script starts one long-running `watch-live` process and records its pid/log paths; use `watch-daemon-status` to inspect it and `uninstall-watch-daemon` to remove the AutoLaunch script. The daemon samples the whole screen by default for startup robustness; pass `install-watch-daemon --iterm-window` if you prefer front-iTerm-window sampling after confirming Accessibility/iTerm2 API startup behavior on your machine.
+Restart iTerm2. A single background `watch-live` process now samples your screen and
+adjusts the terminal's colors and transparency to stay readable. Inspect it with
+`watch-daemon-status`; remove it with `uninstall-watch-daemon`.
+
+That is the whole path: two commands to a tuned profile, three for live auto-adaptation.
+Everything below is for diagnosing, customizing, or scripting.
+
+## What it does
+
+- **Diagnose** a profile: `term-chameleon doctor <profile>.json` reports readability
+  failures (low ANSI-black contrast, Light/Dark variant drift, transparency vs contrast)
+  with WCAG ratios and concrete suggestions.
+- **Fix** conservatively: `term-chameleon fix <profile>.json` previews and applies a
+  readable palette, with a backup and explainable changes.
+- **Apply a mode** to the current terminal over OSC: `term-chameleon osc apply dark-glass --write`
+  (presets: `balanced`, `dark-glass`, `bright-safe`, `accessibility`, `high-variance-safe`,
+  `presentation`). Works on iTerm2, Kitty, Ghostty, and Alacritty.
+- **Adapt live**: `watch-live` samples the screen, classifies background-brightness risk
+  with hysteresis, and applies the matching preset to the current iTerm2 session — reducing
+  transparency when a bright background would wash out text, restoring it when the
+  background is dark.
+
+## How live adaptation works
+
+`watch-live` samples the screen (or the iTerm window region) on an interval, estimates
+background luminance, and runs a risk classifier: bright backgrounds raise washout risk,
+dark backgrounds lower it. A hysteresis selector with a stable-sample count and a cooldown
+decides when to switch modes, avoiding thrash on transient changes. On a switch it applies
+the preset to the live iTerm2 session-local profile — adjusting foreground colors and
+window transparency together — through the iTerm2 Python API.
+
+## Requirements
+
+- macOS with iTerm2 (for live adaptation and profile install)
+- Python 3.11+
+- The `iterm2` Python package for live features: `pip install 'term-chameleon[iterm]'`
+
+OSC color application (`osc apply`) needs none of the above and works on any supporting
+terminal.
 
 ## CLI examples
 

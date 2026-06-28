@@ -1,0 +1,263 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║             TERM-CHAMELEON IMPLEMENTATION FIX MATRIX                         ║
+║                     25 Issues | 45-57 Hours | 4-6 Weeks                     ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+PHASE 1: CRITICAL SECURITY FIXES (8-10 hours, Week 1)
+═══════════════════════════════════════════════════════════════════════════════
+
+ ✓ 1. AppleScript Command Injection                    [BLOCKING] (1-2h)
+       File: live_stage.py:84-96
+       Fix: Add proper escape_applescript_string() function
+       Why: RCE via crafted file paths
+       Tests: 3 unit tests with malicious paths
+
+ ✓ 2. Python Executable Validation                    [BLOCKING] (2-3h)
+       File: watch_daemon.py:68-102
+       Fix: Validate path exists, is executable, runs Python
+       Why: Arbitrary code execution via --python flag
+       Tests: 5 unit tests with various invalid paths
+
+ ✓ 3. Color Blending Out-of-Bounds                   [BLOCKING] (1-2h)
+       File: color.py (blend_over method)
+       Fix: Clamp result to [0, 1] after blending
+       Why: Invalid color data crashes renderers
+       Tests: Run stress test suite (should pass)
+
+ ✓ 4. File Permissions 0o755 → 0o700                [BLOCKING] (0.5h)
+       Files: install.py:109, watch_daemon.py:183, iterm_api.py
+       Fix: Change all .chmod(0o755) to .chmod(0o700)
+       Why: Information disclosure on shared systems
+       Tests: Simple permission verification test
+
+ ✓ 5. Script Integrity Verification                 [BLOCKING] (2h)
+       File: iterm_api.py:87-93
+       Fix: Compute SHA256 checksum after script write
+       Why: TOCTOU race condition; privilege escalation
+       Tests: 3 tests for checksum creation and verification
+
+═══════════════════════════════════════════════════════════════════════════════
+PHASE 2: HIGH PRIORITY BUGS (10-12 hours, Week 2)
+═══════════════════════════════════════════════════════════════════════════════
+
+ ✓ 6. Terminal Detection False Positive (Kitty)     [HIGH] (1-2h)
+       File: terminal.py
+       Fix: Use startswith() instead of substring search
+       Why: Misidentifies xterm-kitty-256color as Kitty
+       Tests: 4 tests with different TERM values
+
+ ✓ 7. OSC Output Error Not Checked                  [HIGH] (1-2h)
+       File: osc.py
+       Fix: Check write length and handle exceptions
+       Why: Silent failures in cross-terminal support
+       Tests: 3-4 tests with closed/broken pipes
+
+ ✓ 8. Extreme: 511-Line main() Function             [HIGH] (4-5h)
+       File: cli.py:77-587
+       Fix: Convert if-chain dispatch to dispatch dictionary
+       Why: Unmaintainable; violates 50-line best practice
+       Tests: All existing CLI tests must pass
+
+ ✓ 9. Performance: O(n²) Pixel Membership           [HIGH] (0.5h)
+       File: text_contrast.py:217
+       Fix: Convert list to set for O(1) lookup
+       Why: 50x slowdown on large images (4K+)
+       Tests: Existing tests pass; benchmark
+
+ ✓ 10. Performance: O(n log n) → O(n) Percentile   [HIGH] (1h)
+       File: pixel_contrast.py:67
+       Fix: Use heapq.nsmallest/nlargest
+       Why: Unnecessary full sort when only extremes needed
+       Tests: Existing tests pass; benchmark
+
+ ✓ 11. Missing Return Type Annotation               [HIGH] (0.25h)
+       File: live_iterm.py:31 (color function)
+       Fix: Add -> iterm2.Color return type
+       Why: Incomplete type checking
+       Tests: mypy --strict passes
+
+═══════════════════════════════════════════════════════════════════════════════
+PHASE 3: MEDIUM PRIORITY - CODE QUALITY (10-12 hours, Week 3)
+═══════════════════════════════════════════════════════════════════════════════
+
+ ✓ 12. Oversized Functions (8 functions >50 lines)  [MEDIUM] (5-6h)
+       Files: cli.py, live_stage.py, watch_live.py, text_contrast.py
+       Fix: Extract helper functions to reduce line counts
+       Why: Improves testability and maintainability
+       Tests: Unit tests for each extracted function
+
+ ✓ 13. Private Attribute Mutations                  [MEDIUM] (1-2h)
+       File: watch_live.py:154
+       Fix: Add public restore_checkpoint() method
+       Why: Encapsulation violation; fragile design
+       Tests: Property-based checkpoint round-trip tests
+
+ ✓ 14. JSON/TOML Size Limit DoS                    [MEDIUM] (1-2h)
+       Files: config.py, iterm_profile.py
+       Fix: Check file size before parsing (10MB limit)
+       Why: Potential DoS via huge config files
+       Tests: 3 tests with oversized files
+
+ ✓ 15. Sanitize Subprocess Output                 [MEDIUM] (0.5-1h)
+       File: cli.py error handling
+       Fix: Strip ANSI escape sequences from stderr/stdout
+       Why: Terminal hijacking via error messages
+       Tests: 2 tests with ANSI codes
+
+ ✓ 16. Histogram Expansion Optimization             [MEDIUM] (0.5h)
+       File: text_contrast.py:85
+       Fix: Use algebraic formula instead of expansion
+       Why: Unnecessary memory/CPU during Otsu threshold
+       Tests: Threshold calculation unchanged
+
+ ✓ 17. Row Score Computation Optimization           [MEDIUM] (0.5h)
+       File: text_contrast.py:113
+       Fix: Filter rows during computation (walrus operator)
+       Why: Avoids computing scores for unused rows
+       Tests: Same rows selected
+
+ ✓ 18. Exception Handling Specificity              [MEDIUM] (2-3h)
+       File: Various (broad Exception catches)
+       Fix: Catch specific exception types
+       Why: Improves debugging; prevents masking errors
+       Tests: Error handling verification
+
+═══════════════════════════════════════════════════════════════════════════════
+PHASE 4: TESTING IMPROVEMENTS (13-17 hours, Week 3-4)
+═══════════════════════════════════════════════════════════════════════════════
+
+ ✓ 19. Unit Tests: contrast.py                      [HIGH] (1-2h)
+       Coverage: contrast_ratio(), format_ratio()
+       Tests: 8-10 new unit tests
+       Gap: Currently 0% coverage
+
+ ✓ 20. Unit Tests: presets.py                       [HIGH] (2-3h)
+       Coverage: get_preset(), apply_preset_to_profile_dict()
+       Tests: 15-20 new unit tests
+       Gap: Currently 0% coverage; all 6 presets untested
+
+ ✓ 21. Unit Tests: iterm_profile.py                [HIGH] (2-3h)
+       Coverage: loads_document(), load_profile(), dumps_document()
+       Tests: 20-25 new unit tests
+       Gap: Currently 0% coverage
+
+ ✓ 22. Unit Tests: fixes.py                         [HIGH] (2-3h)
+       Coverage: apply_balanced_fix(), fix_file()
+       Tests: 15-20 new unit tests
+       Gap: Currently 0% coverage; destructive operations
+
+ ✓ 23. Unit Tests: modes.py                         [HIGH] (1-2h)
+       Coverage: apply_mode()
+       Tests: 12-15 new unit tests
+       Gap: Currently 0% coverage
+
+ ✓ 24. Integration Tests                            [MEDIUM] (3-4h)
+       Test: Load → Diagnose → Fix → Verify flow
+       Test: Load → Apply Mode → Verify flow
+       Test: Install → Make Default → Verify flow
+       Total: 9 integration tests
+
+ ✓ 25. Edge Case Tests                              [MEDIUM] (2-3h)
+       Coverage: Boundary conditions, large images, Unicode paths
+       Source: Adapt from stress test suite (50+ scenarios)
+       Total: 20-30 edge case tests
+
+═══════════════════════════════════════════════════════════════════════════════
+PHASE 5: POLISH (5-8 hours, Ongoing)
+═══════════════════════════════════════════════════════════════════════════════
+
+ • Exception Handling Consistency (1-2h)
+   Cache shutil.which() Results (0.5h)
+   Document Magic Numbers (0.5h)
+   Atomic Write Optimization (1-2h)
+   Additional Performance Tweaks (1-2h)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+EFFORT BREAKDOWN BY CATEGORY
+
+Security:        8-15h  |████████
+Code Quality:   20-30h  |████████████████
+Performance:     8-12h  |██████████
+Testing:        13-17h  |███████████████
+                ─────────────────────
+Total:          46-59h  |███████████████████████
+
+RECOMMENDED PACE: 10-12 hours/week for 4-5 weeks
+CRITICAL PATH:    Phase 1 (Week 1) → DEPLOY
+                  Phase 2 (Week 2) → MERGE
+                  Phase 3-4 (Week 3-4) → CONTINUOUS
+
+═══════════════════════════════════════════════════════════════════════════════
+
+CURRENT METRICS                  →  TARGET METRICS
+─────────────────────────────────────────────────────
+Test Coverage: 76%               →  95%+ coverage
+Functions >50: 9                 →  0 (all <50 lines)
+Security Issues: 7               →  0
+Untested Modules: 8              →  0
+Type Hints: 99%                  →  100%
+Tests: 194                       →  330-340
+Code LOC: 4,200+                 →  <4,000 (after refactoring)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+VERIFICATION CHECKLIST (Before Each Merge)
+
+ □ All new unit tests pass (pytest tests/ -v)
+ □ Type checking passes (mypy src/term_chameleon --strict)
+ □ Linting passes (ruff check src/term_chameleon)
+ □ Code formatted (ruff format src/term_chameleon)
+ □ No performance regression (benchmark if applicable)
+ □ Security review for critical fixes
+ □ Integration tests pass
+ □ Coverage unchanged or improved
+ □ Documentation updated
+ □ Git history clean (atomic commits)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+KEY MILESTONES
+
+ Week 1  →  Phase 1 Complete   →  DEPLOY security fixes
+ Week 2  →  Phase 2 Complete   →  MERGE v0.2 candidate
+ Week 3  →  Phase 3-4 Partial  →  REVIEW code quality + tests
+ Week 4  →  Phase 4 Complete   →  SHIP v0.2 with 95%+ coverage
+
+═══════════════════════════════════════════════════════════════════════════════
+
+DOCUMENTS PROVIDED
+
+1. IMPLEMENTATION_PLAN.md (3,200+ lines)
+   ├─ Detailed analysis of all 25 issues
+   ├─ Code before/after examples
+   ├─ Verification procedures
+   ├─ File locations and effort estimates
+   └─ Risk assessment
+
+2. IMPLEMENTATION_QUICK_START.md (400+ lines)
+   ├─ Developer-friendly checklist
+   ├─ What/why/how for each fix
+   ├─ Command reference
+   └─ Quick effort estimates
+
+3. AUDIT_SUMMARY.md (600+ lines)
+   ├─ Executive overview
+   ├─ Risk assessment by category
+   ├─ Roadmap and timeline
+   ├─ Success criteria
+   └─ Next steps
+
+4. FIX_MATRIX.txt (This file)
+   ├─ Visual matrix of all 25 issues
+   ├─ Phase breakdown
+   ├─ Effort estimates
+   ├─ Verification checklist
+   └─ Milestone timeline
+
+═══════════════════════════════════════════════════════════════════════════════
+
+START HERE: IMPLEMENTATION_QUICK_START.md
+DEEP DIVE: IMPLEMENTATION_PLAN.md
+PLANNING: AUDIT_SUMMARY.md
+OVERVIEW: This file (FIX_MATRIX.txt)

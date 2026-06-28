@@ -2,7 +2,7 @@
   {
     "title": "Negative-origin (secondary-monitor) iTerm window crashes get_iterm_window_bounds() with uncaught ValueError, breaking its graceful-return contract for all callers",
     "severity": "HIGH",
-    "file": "/Users/bodhi/Developer/term-chameleon/src/term_chameleon/iterm_window.py",
+    "file": "src/term_chameleon/iterm_window.py",
     "line": "22-23, 69 (parse called outside the try block at 25-32); also images.py:39-40",
     "description": "get_iterm_window_bounds() is documented and used everywhere as a soft probe that returns WindowBoundsResult(available=False, ...) on failure (see adapt.py:32-37, status.py:105, live_stage.py:189, watch_live.py:172). But _raw_iterm_window_bounds_points() builds Region.parse(raw.removeprefix(\"OK|\")) at line 69, and Region.__post_init__ (images.py:39-40) raises ValueError when x<0 or y<0. AppleScript 'bounds of window 1' returns NEGATIVE left/top whenever the iTerm window is on a secondary monitor placed to the left of, or above, the main display (a very common multi-monitor layout). The Region.parse call sits in _raw_iterm_window_bounds_points(), which get_iterm_window_bounds() invokes at line 22-23 OUTSIDE its own try/except (the try only starts at line 25 and wraps just the pixel conversion). So the ValueError propagates uncaught out of get_iterm_window_bounds(). In run_live_stage (live_stage.py:189) this fires AFTER the Safari and iTerm windows have already been opened, aborting the whole capture, writing no report, and leaving the staged GUI windows open. Reproduction (mocking the osascript subprocess to simulate a left-monitor window): patching subprocess.run to return stdout 'OK|-1440,300,980,760' makes get_iterm_window_bounds() raise 'ValueError: region x/y must be non-negative' instead of returning a result. Region.parse('-1440,300,980,760') alone also raises the same ValueError.",
     "fix": "Wrap the Region.parse call in _raw_iterm_window_bounds_points() (or the whole _raw_iterm_window_bounds_points() invocation at line 22) in a try/except that converts ValueError into WindowBoundsResult(available=False, region=None, message=...). Better: stop rejecting negative origins for window bounds entirely \u2014 a window legitimately has a negative on-screen origin on multi-monitor setups. Either use a separate bounds type that permits negative x/y, or translate the negative origin into the screenshot coordinate space (where _points_region_to_screenshot_pixels already clamps to max(0, x)) before constructing the Region.",
@@ -18,7 +18,7 @@
   {
     "title": "iTerm window-bounds-to-pixels scaling is wrong on multi-monitor because screencapture -x captures only the main display while Finder desktop bounds span all displays",
     "severity": "MEDIUM",
-    "file": "/Users/bodhi/Developer/term-chameleon/src/term_chameleon/iterm_window.py",
+    "file": "src/term_chameleon/iterm_window.py",
     "line": "105-118 (uses _screenshot_size_pixels at 95-102 and _desktop_bounds_points at 75-92); screenshot.py:28-34",
     "description": "_points_region_to_screenshot_pixels derives scale factors as screenshot_pixels / desktop_points. _screenshot_size_pixels() calls capture_screen, which runs `screencapture -x <file>` (screenshot.py:28-34) with no -D/display flag \u2014 on macOS that captures ONLY the main display. But _desktop_bounds_points() reads Finder 'bounds of window of desktop', which on a multi-monitor system returns the bounding rectangle of the ENTIRE desktop spanning all displays (point_width/point_height can far exceed the main display, and left/top can be negative). The two measurements are over different coordinate extents, so scale_x/scale_y are computed against mismatched denominators, mis-scaling the region. When the iTerm window is on a non-main monitor, the mapped origin also lands outside the single-display screenshot, and the subsequent clamp_to (images.py:55-59) raises 'region origin ... is outside image' \u2014 another path that surfaces as a failure during run_live_stage capture. The math is only correct on a single-display setup where Finder desktop bounds equal the captured display.",
     "fix": "Make the two measurements consistent for the targeted display: either capture all displays / the specific display that holds the iTerm window (screencapture -D <n> or capture per-display) and use that display's point bounds, or query the actual display geometry (e.g. via the display containing the window) instead of Finder's full-desktop bounds. Document that the current scaling only supports a single-display layout and fail with a clear message when multiple displays are detected, so callers fall back to an explicit --region.",
@@ -82,7 +82,7 @@
   {
     "title": "No uninstall path for the installed Dynamic Profile or the make-default AutoLaunch script; install leaves permanent state with no removal command",
     "severity": "HIGH",
-    "file": "/Users/bodhi/Developer/term-chameleon/src/term_chameleon/cli.py",
+    "file": "src/term_chameleon/cli.py",
     "line": "90-96, 161-172, 453-459",
     "description": "The only uninstall subcommand is `uninstall-watch-daemon` (cli.py:161, handler cli.py:453). There is NO command to remove the Dynamic Profile written by `install`/`setup` (install.py:install_profile -> ~/Library/Application Support/iTerm2/DynamicProfiles/term-chameleon-adaptive-glass.json) nor the make-default AutoLaunch script (install.py:install_autolaunch_script -> .../Scripts/AutoLaunch/term_chameleon_default_profile.py). Reproduction: `term-chameleon install --make-default` writes a profile JSON and an AutoLaunch .py; nothing in the CLI (only `uninstall-watch-daemon` exists) can remove either. The profile and the AutoLaunch script that forces it default persist forever. install->uninstall therefore does NOT restore prior state: the Dynamic Profile, the make-default AutoLaunch script, and accumulated `.backup.*` siblings all leak. Confirmed: `grep add_parser cli.py` shows no profile-uninstall parser; the install handler (_install, cli.py:667-697) has no inverse.",
     "fix": "Add an `uninstall` (or `uninstall-profile`) subcommand that removes the Dynamic Profile JSON and the make-default AutoLaunch script (with a backup like the watch-daemon uninstall), mirroring uninstall_watch_autolaunch_script. Document the full uninstall sequence in the README alongside the existing watch-daemon uninstall guidance.",
@@ -98,7 +98,7 @@
   {
     "title": "make-default permanently changes the iTerm2 default profile and is never restored (no record of the previous default)",
     "severity": "HIGH",
-    "file": "/Users/bodhi/Developer/term-chameleon/src/term_chameleon/install.py",
+    "file": "src/term_chameleon/install.py",
     "line": "83-92",
     "description": "The generated AutoLaunch script calls `await profile.async_make_default()` (install.py:87) on every iTerm2 launch, permanently overriding whatever profile the user had set as default. Nothing in the codebase records the user's prior default profile (grep for 'make_default|restore|Default Bookmark|previous default' across src returns only the install.py call site and the CLI flag plumbing). Even if the AutoLaunch script were removed, the iTerm2 default would remain set to the Term Chameleon profile from the last launch. There is no command to restore the original default. This is a non-restorable state mutation of the user's environment.",
     "fix": "Before calling async_make_default(), capture the current default profile GUID/name (PartialProfile query) and persist it (e.g. under ~/Library/Application Support/term-chameleon/). Provide an uninstall/restore path that re-sets the saved default and removes the AutoLaunch script. At minimum, document prominently that make-default is not auto-reversible.",
@@ -114,7 +114,7 @@
   {
     "title": "All [project.urls] point to the wrong GitHub owner (broken PyPI links)",
     "severity": "MEDIUM",
-    "file": "/Users/bodhi/Developer/term-chameleon/pyproject.toml",
+    "file": "pyproject.toml",
     "line": "26-29",
     "description": "Homepage/Repository/Issues/Changelog all use `https://github.com/bodhi/term-chameleon` (lines 26-29). `bodhi` is the local macOS home-directory/username, not the repo owner. The actual remote is `git@github.com:connectwithprakash/term-chameleon.git` (verified via `git remote -v`). On a published PyPI page these four sidebar links (Homepage, Repository, Issues, Changelog) would all 404 / point to a non-existent repo. README contains no github.com links so the error is isolated to packaging metadata.",
     "fix": "Replace `bodhi` with `connectwithprakash` in all four URLs in [project.urls], e.g. `Homepage = \"https://github.com/connectwithprakash/term-chameleon\"` and likewise for Repository, Issues, Changelog.",
@@ -122,7 +122,7 @@
     "verdict": {
       "isReal": true,
       "confidence": "high",
-      "reasoning": "Confirmed by reading the file and the git remote. pyproject.toml lines 26-29 hardcode the GitHub owner as `bodhi` for Homepage, Repository, Issues, and Changelog: e.g. `Homepage = \"https://github.com/bodhi/term-chameleon\"`. The actual remote is `git@github.com:connectwithprakash/term-chameleon.git` (verified via `git remote -v`). `bodhi` is the local macOS username (evident from the working directory `/Users/bodhi/Developer/term-chameleon`), not the repo owner. On a published PyPI page these four sidebar links would point to a repo under the wrong/non-existent owner and would not resolve to the canonical repo; the Changelog blob link would 404. `git log -S connectwithprakash -- pyproject.toml` returns nothing, confirming no commit (rounds 1-3 included) ever corrected the owner \u2014 the wrong value is still present at HEAD. The proposed fix is correct. Severity MEDIUM is apt: broken packaging metadata affecting discoverability/trust, no code or security or runtime impact, so not HIGH.",
+      "reasoning": "Confirmed by reading the file and the git remote. pyproject.toml lines 26-29 hardcode the GitHub owner as `bodhi` for Homepage, Repository, Issues, and Changelog: e.g. `Homepage = \"https://github.com/bodhi/term-chameleon\"`. The actual remote is `git@github.com:connectwithprakash/term-chameleon.git` (verified via `git remote -v`). `bodhi` is the local macOS username (evident from the working directory `.`), not the repo owner. On a published PyPI page these four sidebar links would point to a repo under the wrong/non-existent owner and would not resolve to the canonical repo; the Changelog blob link would 404. `git log -S connectwithprakash -- pyproject.toml` returns nothing, confirming no commit (rounds 1-3 included) ever corrected the owner \u2014 the wrong value is still present at HEAD. The proposed fix is correct. Severity MEDIUM is apt: broken packaging metadata affecting discoverability/trust, no code or security or runtime impact, so not HIGH.",
       "adjustedSeverity": "MEDIUM",
       "isNew": true
     }
@@ -162,7 +162,7 @@
   {
     "title": "All generated profiles share one hardcoded GUID, so two installs with different --name collide as duplicate iTerm2 Dynamic Profiles",
     "severity": "MEDIUM",
-    "file": "/Users/bodhi/Developer/term-chameleon/src/term_chameleon/install.py",
+    "file": "src/term_chameleon/install.py",
     "line": "21",
     "description": "profile_document() hardcodes `guid = guid or \"TERM-CHAMELEON-ADAPTIVE-GLASS\"` (install.py:21) regardless of the profile name or filename. Reproduction (run): profile_document(name='Adaptive Glass') and profile_document(name='Custom Name') both yield Guid='TERM-CHAMELEON-ADAPTIVE-GLASS'. iTerm2 Dynamic Profiles are keyed by GUID, so installing under two different --name values (or two filenames) produces two on-disk JSON files that iTerm2 sees as the SAME profile GUID \u2014 it logs a duplicate-GUID conflict and nondeterministically keeps one. State leaks across installs: a second install with a different filename does not replace the first file on disk (install_profile only backs up/overwrites the same filename), leaving an orphan JSON that conflicts in iTerm2.",
     "fix": "Derive the GUID deterministically from the profile name (e.g. a stable hash of name) or generate/persist a unique GUID per installed file, so distinct profiles do not collide and re-installs of the same logical profile remain stable.",
@@ -170,7 +170,7 @@
     "verdict": {
       "isReal": true,
       "confidence": "high",
-      "reasoning": "Verified against real code at /Users/bodhi/Developer/term-chameleon/src/term_chameleon/install.py:21. The GUID is hardcoded `guid = guid or \"TERM-CHAMELEON-ADAPTIVE-GLASS\"` and never derived from name/filename. Reproduced via the .venv python: profile_document(name='Adaptive Glass') and profile_document(name='Custom Name') both yield Guid='TERM-CHAMELEON-ADAPTIVE-GLASS' (collide:True). iTerm2 keying Dynamic Profiles by GUID is accurate, so two distinct on-disk files sharing one GUID is a genuine conflict.\n\nHOWEVER the claim's headline framing is materially overstated. The CLI install command (cli.py:90-96, handler _install at 667-697) exposes --name but NOT --filename; install_profile always uses the default filename 'term-chameleon-adaptive-glass.json' from the CLI. I tested both scenarios on disk in /tmp: two installs with different --name values produce exactly ONE file (the second backs up and overwrites the first via backup_file + atomic_write_text) \u2014 no orphan, no on-disk duplicate, no iTerm2 conflict. The \"two on-disk JSON files that iTerm2 sees as the SAME profile GUID\" outcome ONLY occurs when passing distinct filename= values, which is reachable solely via the internal Python API (install_profile(filename=...)). That parameter is untested, unused internally, and not user-reachable through the CLI.\n\nSo: the design smell (shared hardcoded GUID defeating per-profile identity / breaking idempotency if anyone builds multi-profile installs on the API) is real and never fixed (git -S shows the line unchanged since the original scaffold commit 39b8420, confirming isNew). But the claimed user-facing duplicate/orphan-conflict via --name does not occur \u2014 different --name alone overwrites a single file. Practical impact is confined to an internal API edge that the product never exercises, so severity is LOW rather than MEDIUM. The proposed fix (deterministic GUID from name) is still reasonable hygiene.",
+      "reasoning": "Verified against real code at src/term_chameleon/install.py:21. The GUID is hardcoded `guid = guid or \"TERM-CHAMELEON-ADAPTIVE-GLASS\"` and never derived from name/filename. Reproduced via the .venv python: profile_document(name='Adaptive Glass') and profile_document(name='Custom Name') both yield Guid='TERM-CHAMELEON-ADAPTIVE-GLASS' (collide:True). iTerm2 keying Dynamic Profiles by GUID is accurate, so two distinct on-disk files sharing one GUID is a genuine conflict.\n\nHOWEVER the claim's headline framing is materially overstated. The CLI install command (cli.py:90-96, handler _install at 667-697) exposes --name but NOT --filename; install_profile always uses the default filename 'term-chameleon-adaptive-glass.json' from the CLI. I tested both scenarios on disk in /tmp: two installs with different --name values produce exactly ONE file (the second backs up and overwrites the first via backup_file + atomic_write_text) \u2014 no orphan, no on-disk duplicate, no iTerm2 conflict. The \"two on-disk JSON files that iTerm2 sees as the SAME profile GUID\" outcome ONLY occurs when passing distinct filename= values, which is reachable solely via the internal Python API (install_profile(filename=...)). That parameter is untested, unused internally, and not user-reachable through the CLI.\n\nSo: the design smell (shared hardcoded GUID defeating per-profile identity / breaking idempotency if anyone builds multi-profile installs on the API) is real and never fixed (git -S shows the line unchanged since the original scaffold commit 39b8420, confirming isNew). But the claimed user-facing duplicate/orphan-conflict via --name does not occur \u2014 different --name alone overwrites a single file. Practical impact is confined to an internal API edge that the product never exercises, so severity is LOW rather than MEDIUM. The proposed fix (deterministic GUID from name) is still reasonable hygiene.",
       "adjustedSeverity": "LOW",
       "isNew": true
     }
@@ -178,7 +178,7 @@
   {
     "title": "Identical re-installs unconditionally create a backup of byte-identical content, leaking redundant backup files",
     "severity": "LOW",
-    "file": "/Users/bodhi/Developer/term-chameleon/src/term_chameleon/install.py",
+    "file": "src/term_chameleon/install.py",
     "line": "48-50",
     "description": "install_profile (install.py:48-49) and install_autolaunch_script (install.py:106-108) call backup_file() whenever the target exists, with no content comparison. Reproduction (run): installing the same profile three times leaves term-chameleon-adaptive-glass.json plus two `.backup.<timestamp>` files in the DynamicProfiles dir even though every write was byte-identical. While safe_io._prune_backups now caps total backups at MAX_BACKUPS=5 (so growth is bounded), re-running an idempotent install still churns backups of unchanged files and pushes out genuinely older backups. uninstall-watch-daemon similarly adds yet another backup on removal, none of which are cleaned by any uninstall.",
     "fix": "Skip backup_file()/atomic_write when the new content equals the existing file content (read-and-compare before writing), making re-install truly idempotent and avoiding redundant backups.",
@@ -194,7 +194,7 @@
   {
     "title": "Dead [visual] optional dependency: pillow declared but never imported",
     "severity": "MEDIUM",
-    "file": "/Users/bodhi/Developer/term-chameleon/pyproject.toml",
+    "file": "pyproject.toml",
     "line": "34",
     "description": "pyproject declares an optional dependency `visual = [\"pillow>=10.0\"]` (line 34), implying screenshot/visual commands need Pillow. In reality nothing in the package imports PIL/Pillow: `grep -rln \"PIL|pillow|Pillow\" src/ tests/` returns nothing. The package ships its own PNG codec (src/term_chameleon/png.py uses struct+zlib) and raster handling (images.py). I confirmed all visual-path commands run in the .venv (which has no Pillow installed): `visual-test`, `background-html`, `pattern-script`, `e2e-stage`, `screenshot-test`, `sample` all exit 0. The `[visual]` extra is therefore entirely dead \u2014 installing `term-chameleon[visual]` pulls a ~10MB dependency that is never used. It is also referenced nowhere in README, CHANGELOG, docs/, or CI (CI only uses `--extra dev`).",
     "fix": "Remove the `visual = [\"pillow>=10.0\"]` extra from [project.optional-dependencies] in pyproject.toml, OR, if Pillow-backed image handling is intended future work, document it and gate it behind an actual import. As shipped it is misleading dead metadata.",
@@ -210,7 +210,7 @@
   {
     "title": "README brands v0.1.1 as 'beta' while package metadata and CHANGELOG declare it stable",
     "severity": "MEDIUM",
-    "file": "/Users/bodhi/Developer/term-chameleon/README.md",
+    "file": "README.md",
     "line": "9, 47, 58",
     "description": "The current README (package version 0.1.1) repeatedly calls the release a beta: line 9 'a dogfooded beta for...', line 47 'Build and install the beta wheel locally', line 58 'dogfooded for this beta'. This contradicts the actual release state: pyproject.toml line 15 sets `Development Status :: 5 - Production/Stable`, and CHANGELOG.md line 24 (0.1.0) states 'Promoted from beta to stable after sustained daemon dogfood'. 0.1.1 is built on top of the stable 0.1.0 (both dated 2026-06-27). So the headline status the user reads in the README directly conflicts with the PyPI classifier and the changelog \u2014 a reader cannot tell whether this is beta or stable.",
     "fix": "Update README 'Current status' and 'Beta release verification' sections to reflect the stable status (or, if it really should be beta, revert the pyproject classifier to `4 - Beta` and the CHANGELOG 0.1.0 'promoted to stable' note). Pick one source of truth and make README/pyproject/CHANGELOG agree.",
@@ -226,7 +226,7 @@
   {
     "title": "CHANGELOG claim 'help= text to all key CLI arguments' is overstated; several documented arguments have no help",
     "severity": "LOW",
-    "file": "/Users/bodhi/Developer/term-chameleon/CHANGELOG.md",
+    "file": "CHANGELOG.md",
     "line": "19",
     "description": "CHANGELOG 0.1.1 line 19 (and 0.1.0 line 30) claim 'Added `help=` text to all key CLI arguments.' Inspecting actual --help output shows multiple arguments with empty help text, including ones used in README examples: `install --name` and `install --target-dir` (used in README line 102) render with no description; `release-check --threshold` (used in README lines 55/68) has no help; `release-check --profile/--width/--height/--settle-delay` have none; and the `osc` subcommand's two positionals (`{apply,reset}` and the preset choice) have no help even though `osc apply --write` is a headline 0.1.1 feature (CHANGELOG line 8). Reproduction: `.venv/bin/python -m term_chameleon.cli install --help` and `... release-check --help` show the bare `--name NAME` / `--threshold THRESHOLD` lines with no following description.",
     "fix": "Either add help= strings to these arguments (especially --name, --target-dir, --threshold, and the osc positionals, which appear in README examples) or soften the CHANGELOG wording from 'all key CLI arguments' to reflect that coverage is partial.",
@@ -242,7 +242,7 @@
   {
     "title": "Headline feature osc apply --write and commands terminal-info / watch-sim have no runnable example in README",
     "severity": "LOW",
-    "file": "/Users/bodhi/Developer/term-chameleon/README.md",
+    "file": "README.md",
     "line": "75-194",
     "description": "The 'CLI examples' section documents 28 commands but omits three that the docs otherwise tout. `osc apply --write` is a headline 0.1.1 CHANGELOG entry (line 8: 'writes raw OSC escape sequences to any OSC-capable terminal') and OSC generation is in the README Implemented list (line 18), yet the `osc` command appears in zero README example blocks. `terminal-info` is referenced in prose (README line 35) but has no example. `watch-sim` is in the Implemented list (line 19) with no example. All three exist and work: `osc apply balanced --write`, `terminal-info`, and `watch-sim` are real subcommands (verified via --help and execution). A reader cannot discover the syntax for the cross-terminal OSC feature that the changelog highlights.",
     "fix": "Add example invocations for `osc apply <preset> [--write|--tmux|--shell]`, `osc reset`, `terminal-info`, and `watch-sim` to the README CLI examples section so the documented headline cross-terminal feature is actually demonstrated.",
