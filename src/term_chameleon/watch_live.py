@@ -107,6 +107,9 @@ DEMO_CYCLE_LUMINANCES: tuple[float, ...] = (0.08, 0.08, 0.92, 0.92)
 # obvious on an opaque window. The real presets share a near-identical dark
 # background and adapt via transparency (invisible without a translucent window),
 # so these exaggerated colors exist purely to make the demo legible on screen.
+# DEMO_CYCLE_LUMINANCES only drives dark-glass and bright-safe today; the other
+# entries are kept so any mode reached by a future cycle still gets a distinct tint
+# (an unmapped mode falls back to its real background via .get()).
 DEMO_MODE_BACKGROUNDS: dict[str, str] = {
     "dark-glass": "#0A0E1A",
     "balanced": "#1C1330",

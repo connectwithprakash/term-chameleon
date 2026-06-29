@@ -62,10 +62,11 @@ def terminal_info(*, json_output: bool = False) -> int:
 
 
 def backdrop_info(*, json_output: bool = False) -> int:
-    """Report which backdrop-capture backend the watcher will use.
+    """Report the backdrop-capture backend in use and whether the true-backdrop
+    (ScreenCaptureKit) upgrade is available.
 
-    screencapturekit (when the optional 'sck' extra is installed) captures the true
-    backdrop behind the terminal; otherwise the built-in screencapture composite grab.
+    The watcher currently uses the screencapture composite grab; the SCK exclude-terminal
+    capture is a planned upgrade gated by the optional 'sck' extra.
     """
     from ..backdrop import detect_backdrop_capability
 

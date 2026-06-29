@@ -28,8 +28,12 @@ term-chameleon install-watch-daemon
 ```
 
 Restart iTerm2. A single background `watch-live` process now samples your screen and
-adjusts the terminal's colors and transparency to stay readable. Inspect it with
+adjusts the terminal's colors and transparency to stay readable. You do not run anything
+again — the daemon starts itself every time iTerm2 launches. Inspect it with
 `watch-daemon-status`; remove it with `uninstall-watch-daemon`.
+
+If you later upgrade the package (`pip install -U term-chameleon`), re-run
+`term-chameleon install-watch-daemon` once so the daemon points at the new version.
 
 That is the whole path: two commands to a tuned profile, three for live auto-adaptation.
 Everything below is for diagnosing, customizing, or scripting.

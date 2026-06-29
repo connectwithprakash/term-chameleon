@@ -39,26 +39,27 @@ def _sck_importable() -> bool:
 
 
 def detect_backdrop_capability() -> BackdropCapability:
-    """Report which backdrop backend the watcher will use, and why.
+    """Report whether the true-backdrop (ScreenCaptureKit) path is available.
 
-    Does not capture; only inspects what is importable. The screencapturekit backend is
-    selected only when its framework is importable. Actual permission (TCC) is verified at
-    capture time, where a failure falls back to screencapture.
+    Does not capture; only inspects what is importable. NOTE: the watcher currently always
+    uses the screencapture composite grab — the SCK exclude-terminal capture is a planned
+    upgrade gated by the 'sck' extra (see docs/design-adaptive-readability.md). This reports
+    readiness for that path, not that it is in use yet.
     """
     if _sck_importable():
         return BackdropCapability(
-            backend="screencapturekit",
+            backend="screencapture",
             sck_importable=True,
             reason=(
-                "ScreenCaptureKit available; will capture the backdrop "
-                "excluding the terminal window"
+                "ScreenCaptureKit is importable; true-backdrop capture is not yet wired, so "
+                "the watcher still uses the screencapture composite grab"
             ),
         )
     return BackdropCapability(
         backend="screencapture",
         sck_importable=False,
         reason=(
-            "ScreenCaptureKit not importable (install the 'sck' extra for true-backdrop "
-            "capture); using the screencapture composite grab"
+            "ScreenCaptureKit not importable (install the 'sck' extra to enable the planned "
+            "true-backdrop capture); using the screencapture composite grab"
         ),
     )

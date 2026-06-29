@@ -19,11 +19,14 @@ def test_capability_falls_back_when_sck_absent(monkeypatch):
     assert "ScreenCaptureKit" in cap.reason
 
 
-def test_capability_selects_sck_when_present(monkeypatch):
+def test_capability_reports_sck_readiness_but_still_uses_screencapture(monkeypatch):
+    # SCK importable means the true-backdrop path is *ready*, but it is not wired yet,
+    # so the active backend honestly stays screencapture.
     monkeypatch.setattr(backdrop, "_sck_importable", lambda: True)
     cap = backdrop.detect_backdrop_capability()
-    assert cap.backend == "screencapturekit"
+    assert cap.backend == "screencapture"
     assert cap.sck_importable is True
+    assert "not yet wired" in cap.reason
 
 
 def test_sck_is_not_a_hard_dependency():
