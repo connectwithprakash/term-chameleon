@@ -15,6 +15,9 @@ def test_live_adapter_script_compiles_and_contains_session_local_api():
     assert "async_set_profile_properties" in content
     assert "set_background_color" in content
     assert "#090C16" in content
+    # The light/dark-mode disabler must appear before the base-color setters so that
+    # iTerm2 renders from the base keys the live path writes (mirrors the profile-dict path).
+    assert "set_use_separate_colors_for_light_and_dark_mode" in content
 
 
 def test_write_live_adapter_script(tmp_path):
@@ -58,7 +61,9 @@ def test_live_adapter_setters_are_documented():
     setters = live_adapter_setters()
     assert "set_background_color" in setters
     assert "set_minimum_contrast" in setters
-    assert len(setters) >= 10
+    # The light/dark-mode disabler must be present to mirror the profile-dict path.
+    assert "set_use_separate_colors_for_light_and_dark_mode" in setters
+    assert len(setters) >= 11
 
 
 def test_iterm_live_script_cli_writes_file(tmp_path, capsys):

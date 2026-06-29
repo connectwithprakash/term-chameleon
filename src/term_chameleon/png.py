@@ -9,10 +9,13 @@ from .images import RasterImage
 
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 
-# Reject images whose total pixel count exceeds this limit.  A 4000×4000 RGB
-# image already decompresses to ~48 MB of raw scanline data; this constant
-# keeps both memory and CPU bounded on hostile or accidentally huge inputs.
-MAX_PIXELS = 4_000_000  # 4 MP ceiling (e.g. 2000×2000)
+# Reject images whose total pixel count exceeds this limit.  The ceiling must
+# cover the largest current Retina display (27" iMac 5K = ~14.7 MP at 2x) while
+# keeping peak RAM bounded on hostile inputs.  A 16 MP RGB image decompresses
+# to ~48 MB of raw scanline data — acceptable for a one-shot analysis pass.
+# The watch-live path downsamples via sips before calling analyze_image_file,
+# so in practice the ceiling is hit only by screenshot_test / adapt paths.
+MAX_PIXELS = 16_000_000  # 16 MP ceiling (covers 27" iMac 5K 2x)
 
 
 def read_png(path: str | Path) -> RasterImage:
@@ -48,8 +51,12 @@ def read_png(path: str | Path) -> RasterImage:
     if width * height > MAX_PIXELS:
         raise ValueError(f"PNG dimensions {width}×{height} exceed the {MAX_PIXELS:,}-pixel limit")
     channels = _channels_for_color_type(color_type)
-    # Bound decompression to the exact expected raw size so a decompression
-    # bomb cannot expand the output beyond the bytes we are about to allocate.
+    # Compute the exact expected raw size from the already-bounded dimensions.
+    # Note: bufsize is only an initial allocation hint for zlib — it does NOT cap
+    # the output size.  The actual decompression-bomb protection is a two-layer
+    # chain: (1) MAX_PIXELS on line above limits width*height, so max_raw is at
+    # most ~16 MB for 4 M pixels × 4 channels; (2) the post-decompression check
+    # below rejects any stream that expands beyond max_raw bytes.
     max_raw = height * (1 + width * channels)
     try:
         raw = zlib.decompress(b"".join(idat_parts), wbits=15, bufsize=max_raw + 1)

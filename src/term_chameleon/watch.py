@@ -19,6 +19,11 @@ RISK_TO_MODE: dict[Risk, str] = {
     "unknown": "balanced",
 }
 
+# Risk levels where text is actively washing out; switching into one of these is
+# a readability emergency that overrides both the cooldown and the luminance-delta
+# anti-thrash gates so the correct preset is applied immediately.
+HIGH_RISK: frozenset[Risk] = frozenset({"bright-high-risk", "high-variance-high-risk"})
+
 
 @dataclass(frozen=True)
 class Sample:
@@ -77,7 +82,7 @@ class ModeSelector:
             self._candidate_count = 0
             return self.current_mode, classification, False
 
-        if self._last_switch_luminance is not None:
+        if self._last_switch_luminance is not None and classification.risk not in HIGH_RISK:
             delta = abs(sample.luminance - self._last_switch_luminance)
             if delta < self.min_luminance_delta:
                 return self.current_mode, classification, False

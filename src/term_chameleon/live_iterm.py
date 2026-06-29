@@ -88,6 +88,13 @@ def apply_preset_to_current_session(
     except Exception as exc:
         raise RuntimeError(f"iTerm2 live apply failed: {exc}") from exc
 
+    if not applied_setters:
+        raise RuntimeError(
+            f"iTerm2 live apply set no properties for preset {preset_name!r}; "
+            "LocalWriteOnlyProfile setters are missing — "
+            "run `term-chameleon live` to check environment compatibility"
+        )
+
     return LiveApplyResult(
         preset=preset_name,
         applied=True,

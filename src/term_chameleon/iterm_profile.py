@@ -8,21 +8,6 @@ from typing import Any
 from .color import Color
 from .safe_io import atomic_write_text
 
-COLOR_KEYS = [
-    "Background Color",
-    "Foreground Color",
-    "Bold Color",
-    "Cursor Color",
-    "Selection Color",
-    "Selected Text Color",
-    "Ansi 0 Color",
-    "Ansi 7 Color",
-    "Ansi 8 Color",
-    "Ansi 15 Color",
-]
-
-VARIANT_SUFFIXES = [" (Light)", " (Dark)"]
-
 
 @dataclass
 class ItermProfile:
@@ -75,34 +60,47 @@ class ItermProfile:
         except (ValueError, TypeError):
             return True
 
-    def set_color(self, key: str, color: Color) -> None:
-        """Write color into the profile, preserving Color Space and any unknown keys.
-
-        If the profile already contains a dict for ``key``, unknown keys (such
-        as the original "Color Space" value and any iTerm-specific extras) are
-        kept intact so that round-tripping a P3/wide-gamut profile does not
-        silently reinterpret the component values under a different gamut.
-        """
-        existing = self.profile.get(key)
-        base: dict[str, object] = dict(existing) if isinstance(existing, dict) else {}
-        # Merge only the four numeric component keys; let the existing Color Space
-        # and any other iTerm-specific keys remain unchanged.
-        new_dict = color.to_iterm_dict()
-        component_keys = ("Red Component", "Green Component", "Blue Component", "Alpha Component")
-        for k in component_keys:
-            base[k] = new_dict[k]
-        # For a new key with no prior dict, include the Color Space from to_iterm_dict.
-        if "Color Space" not in base:
-            base["Color Space"] = new_dict["Color Space"]
-        self.profile[key] = base
-
     def minimum_contrast(self) -> float | None:
+        """Return Minimum Contrast as a float, or None if absent or malformed."""
         value = self.profile.get("Minimum Contrast")
-        return float(value) if value is not None else None
+        if value is None:
+            return None
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
+    def is_minimum_contrast_malformed(self) -> bool:
+        """Return True when Minimum Contrast is present but not coercible to float."""
+        value = self.profile.get("Minimum Contrast")
+        if value is None:
+            return False
+        try:
+            float(value)
+            return False
+        except (TypeError, ValueError):
+            return True
 
     def transparency(self) -> float | None:
+        """Return Transparency as a float, or None if absent or malformed."""
         value = self.profile.get("Transparency")
-        return float(value) if value is not None else None
+        if value is None:
+            return None
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
+    def is_transparency_malformed(self) -> bool:
+        """Return True when Transparency is present but not coercible to float."""
+        value = self.profile.get("Transparency")
+        if value is None:
+            return False
+        try:
+            float(value)
+            return False
+        except (TypeError, ValueError):
+            return True
 
     def write(self, path: Path | None = None) -> None:
         """Serialise the profile document and write it atomically to *path*.

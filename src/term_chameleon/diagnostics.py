@@ -33,19 +33,11 @@ def diagnose(profile: ItermProfile) -> list[Diagnostic]:
     # Detect present-but-unparseable color dicts before running contrast checks.
     # A malformed color makes color() return None, silently skipping all contrast
     # diagnostics; we surface it explicitly here instead.
-    _MALFORMED_COLOR_KEYS: list[tuple[str, str]] = [
-        ("Background Color", "MALFORMED_BACKGROUND_COLOR"),
-        ("Foreground Color", "MALFORMED_FOREGROUND_COLOR"),
-        ("Bold Color", "MALFORMED_BOLD_COLOR"),
-        ("Cursor Color", "MALFORMED_CURSOR_COLOR"),
-        ("Selection Color", "MALFORMED_SELECTION_COLOR"),
-        ("Selected Text Color", "MALFORMED_SELECTED_TEXT_COLOR"),
-        ("Ansi 0 Color", "MALFORMED_ANSI_0_COLOR"),
-        ("Ansi 7 Color", "MALFORMED_ANSI_7_COLOR"),
-        ("Ansi 8 Color", "MALFORMED_ANSI_8_COLOR"),
-        ("Ansi 15 Color", "MALFORMED_ANSI_15_COLOR"),
-    ]
-    for color_key, code in _MALFORMED_COLOR_KEYS:
+    # Derive the malformed-key list from COLOR_FIELD_MAP so adding a new color
+    # key to presets.py automatically covers it here without a manual edit.
+    for color_key, code in (
+        (k, "MALFORMED_" + k.upper().replace(" ", "_")) for k in COLOR_FIELD_MAP
+    ):
         if profile.is_color_malformed(color_key):
             diagnostics.append(
                 Diagnostic(
@@ -140,6 +132,30 @@ def diagnose(profile: ItermProfile) -> list[Diagnostic]:
             selected,
             selection,
             3.0,
+        )
+
+    if profile.is_transparency_malformed():
+        diagnostics.append(
+            Diagnostic(
+                FAIL,
+                "MALFORMED_TRANSPARENCY",
+                "'Transparency' is present but could not be parsed as a number",
+                "The value for 'Transparency' is not a numeric type. "
+                "Transparency checks are skipped.",
+                "Re-export the profile from iTerm2 or correct the value manually.",
+            )
+        )
+
+    if profile.is_minimum_contrast_malformed():
+        diagnostics.append(
+            Diagnostic(
+                FAIL,
+                "MALFORMED_MINIMUM_CONTRAST",
+                "'Minimum Contrast' is present but could not be parsed as a number",
+                "The value for 'Minimum Contrast' is not a numeric type. "
+                "Minimum Contrast checks are skipped.",
+                "Re-export the profile from iTerm2 or correct the value manually.",
+            )
         )
 
     transparency = profile.transparency()

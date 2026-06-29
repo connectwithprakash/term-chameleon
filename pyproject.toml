@@ -31,8 +31,8 @@ Changelog = "https://github.com/connectwithprakash/term-chameleon/blob/main/CHAN
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "ruff>=0.5"]
 iterm = ["iterm2>=2.9"]
-# Optional true-backdrop capture (excludes the terminal window) for a more accurate
-# adaptation decision. Falls back to the built-in `screencapture` grab when absent.
+# Readiness for a planned true-backdrop capture path (excludes the terminal window);
+# the watcher currently still uses the built-in `screencapture` grab in all cases.
 sck = ["pyobjc-framework-ScreenCaptureKit>=10.0"]
 
 [project.scripts]

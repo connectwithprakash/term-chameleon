@@ -23,17 +23,36 @@ def test_watch_live_command_defaults_to_whole_screen():
     assert "--iterm-window" not in command
     assert "--region" not in command
     assert "--duration" in command
+    # Whole-screen mode must be pinned explicitly so the child cannot re-derive
+    # the sampling mode from [watch] config (seam fix).
+    assert "--whole-screen" in command
 
 
 def test_watch_live_command_supports_iterm_window_region_and_whole_screen():
     iterm_command = watch_live_command(executable=sys.executable, iterm_window=True)
     assert "--iterm-window" in iterm_command
+    assert "--whole-screen" not in iterm_command
     region_command = watch_live_command(executable=sys.executable, region="1,2,3,4")
     assert "--region" in region_command
     assert "--iterm-window" not in region_command
+    assert "--whole-screen" not in region_command
     whole_command = watch_live_command(executable=sys.executable, iterm_window=False)
     assert "--iterm-window" not in whole_command
     assert "--region" not in whole_command
+    assert "--whole-screen" in whole_command
+
+
+def test_watch_live_command_whole_screen_pins_sampling_mode():
+    """--whole-screen must be emitted when neither --region nor --iterm-window
+    is set, so the child cannot re-derive the sampling mode from [watch] config.
+    Regression: without this flag the child read [watch] iterm_window=true and
+    silently switched to iTerm-window sampling while the installer had resolved
+    whole-screen mode from [daemon] config.
+    """
+    cmd = watch_live_command(executable=sys.executable)
+    assert "--whole-screen" in cmd
+    assert "--iterm-window" not in cmd
+    assert "--region" not in cmd
 
 
 def test_watch_autolaunch_script_compiles():

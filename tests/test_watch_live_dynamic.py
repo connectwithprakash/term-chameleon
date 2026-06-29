@@ -193,6 +193,21 @@ def test_demo_cycle_switches_with_default_stable(monkeypatch):
         )
 
     monkeypatch.setattr(cli_module, "run_watch_live", fake_run)
+    # Patch terminal detection so the iTerm2 guard doesn't block the test.
+    # The test's fake_run never calls the real iTerm2 API; we're testing that
+    # stable/cooldown defaults are overridden correctly for demo_cycle.
+    import term_chameleon.terminal as terminal_mod
+    from term_chameleon.terminal import TerminalInfo
+
+    fake_term = TerminalInfo(
+        name="iterm2",
+        is_iterm2=True,
+        is_kitty=False,
+        is_ghostty=False,
+        is_alacritty=False,
+        is_supported=True,
+    )
+    monkeypatch.setattr(terminal_mod, "detect_terminal", lambda: fake_term)
     # Invoke the command handler the way the CLI does, WITHOUT stable/cooldown.
     rc = watch_cmd.watch_live(
         interval=1,

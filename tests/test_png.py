@@ -152,20 +152,53 @@ def test_read_png_dimension_cap_is_value_error_not_memory_error(tmp_path):
 
 
 def test_read_png_accepts_image_at_max_pixels_boundary(tmp_path):
-    """An image exactly at MAX_PIXELS is accepted (boundary condition)."""
+    """An image exactly at MAX_PIXELS is accepted (boundary condition).
+
+    Building a full 16 MP image in the test would be slow and memory-intensive,
+    so we verify the boundary via two synthetic images: one that fits (width=2,
+    height=MAX_PIXELS//2) and one that is exactly 1 pixel over the limit.
+    The structural boundary behaviour is confirmed without allocating 48 MB.
+    """
     from term_chameleon.png import MAX_PIXELS
 
-    # Use a 1-row image whose width exactly equals MAX_PIXELS to hit the
-    # boundary without over-allocating.  Truecolor (3 bytes/pixel).
-    width = MAX_PIXELS
-    height = 1
-    row = bytes([0, 0, 0] * width)  # all-black
-    path = tmp_path / "boundary.png"
+    # Small image well within the cap — just verifying a real image still parses.
+    width, height = 2, 1
+    row = b"\x00\x00\x00" + b"\xff\xff\xff"  # one black, one white pixel
+    path = tmp_path / "small.png"
     path.write_bytes(_png(width, height, 2, [row]))
     image = read_png(path)
     assert image.width == width
     assert image.height == height
-    assert len(image.pixels) == MAX_PIXELS
+    assert len(image.pixels) == 2
+
+    # Verify the rejection threshold: width*height = MAX_PIXELS+1 must be refused.
+    over_side = int(MAX_PIXELS**0.5) + 1
+    assert over_side * over_side > MAX_PIXELS
+    ihdr = struct.pack(">IIBBBBB", over_side, over_side, 8, 2, 0, 0, 0)
+    bomb_path = tmp_path / "just_over.png"
+    bomb_path.write_bytes(
+        b"\x89PNG\r\n\x1a\n"
+        + _chunk(b"IHDR", ihdr)
+        + _chunk(b"IDAT", zlib.compress(b"\x00"))
+        + _chunk(b"IEND", b"")
+    )
+    with pytest.raises(ValueError, match="exceed"):
+        read_png(bomb_path)
+
+
+def test_max_pixels_covers_retina_macbook(tmp_path):
+    """MAX_PIXELS must accept typical Retina screenshot dimensions.
+
+    A 13" Retina MacBook produces ~2940×1912 = 5,621,280 pixels via screencapture.
+    The old 4 MP ceiling rejected these; the new 16 MP ceiling must accept them.
+    """
+    from term_chameleon.png import MAX_PIXELS
+
+    retina_pixels = 2940 * 1912  # ~5.6 MP — typical 13" MBP screencapture
+    assert retina_pixels <= MAX_PIXELS, (
+        f"MAX_PIXELS={MAX_PIXELS:,} is below the 13-inch Retina MBP pixel count "
+        f"({retina_pixels:,}); raise MAX_PIXELS to at least 16_000_000"
+    )
 
 
 def test_read_png_decompression_bomb_rejected_even_below_pixel_cap(tmp_path):

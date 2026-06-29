@@ -7,7 +7,6 @@ from pathlib import Path
 
 from .commands import checks, demo, imaging, live, profile, watch
 from .commands.watch import watch_live as _watch_live
-from .config import DEFAULT_CONFIG_PATH
 from .install import (
     DEFAULT_APP_STATE_DIR,
     DEFAULT_AUTOLAUNCH_DIR,
@@ -257,8 +256,8 @@ def main(argv: list[str] | None = None) -> int:
     config_check.add_argument(
         "--config",
         type=Path,
-        default=DEFAULT_CONFIG_PATH,
-        help="TOML config file to validate",
+        default=None,
+        help="TOML config file to validate (default: ~/.config/term-chameleon/config.toml)",
     )
     config_check.add_argument("--json", action="store_true", help="Emit validation as JSON")
 
@@ -321,7 +320,10 @@ def main(argv: list[str] | None = None) -> int:
 
     sub.add_parser(
         "demo",
-        help="Apply each readability preset to the live iTerm2 session in turn (watch it adapt)",
+        help=(
+            "Apply a representative range of readability presets"
+            " to the live iTerm2 session (watch it adapt)"
+        ),
     )
 
     screenshot_test = sub.add_parser(

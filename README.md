@@ -18,8 +18,9 @@ pip install 'term-chameleon[iterm]'
 term-chameleon setup --yes
 ```
 
-`setup --yes` runs a permission-free self-check and installs the adaptive "Glass" profile
-into iTerm2. Select that profile in iTerm2 and you have a tuned, readable glass terminal.
+`setup --yes` runs a permission-free self-check and installs the "Adaptive Glass Alpha"
+profile into iTerm2. Select that profile in iTerm2 and you have a tuned, readable glass
+terminal.
 
 Want it to adapt automatically as your background changes? Install the watcher:
 
@@ -85,12 +86,14 @@ reasoning.
 ### Sampling accuracy (optional)
 
 By default the watcher samples via `screencapture`, which sees the already-composited screen.
-Installing the optional extra enables a more accurate true-backdrop capture that excludes the
-terminal window:
+Installing the optional `[sck]` extra (ScreenCaptureKit) prepares the package for a planned
+true-backdrop capture path that will exclude the terminal window for a more accurate adaptation
+decision. The watcher currently still uses the `screencapture` composite grab in all cases; run
+`term-chameleon backdrop-info` to see the detected readiness on your system:
 
 ```bash
 pip install 'term-chameleon[sck]'
-term-chameleon backdrop-info   # shows which backend is active
+term-chameleon backdrop-info   # reports active backend and SCK readiness
 ```
 
 It falls back to `screencapture` automatically when unavailable, so the tool works either way.
@@ -108,7 +111,7 @@ Quickest look — cycle the presets on your current terminal and watch the color
 term-chameleon demo
 ```
 
-`demo` applies each preset to your live iTerm2 session in turn, pausing between each, so
+`demo` applies a representative range of presets to your live iTerm2 session in turn, pausing between each, so
 you can watch the foreground colors and transparency shift. Run it from a visible iTerm2
 window.
 
@@ -129,7 +132,7 @@ window. Record the iTerm2 window with Cmd-Shift-5 while it runs to capture the c
 To see the full glass effect — colors adapting to a background *behind* a translucent
 terminal:
 
-1. In iTerm2, select the installed "Adaptive Glass" profile (translucent), or set your
+1. In iTerm2, select the installed "Adaptive Glass Alpha" profile (translucent), or set your
    current profile's Transparency to about 30% with Blur on.
 2. Put a browser or document window behind the terminal so it shows through.
 3. Start the watcher and change what's behind the terminal:
@@ -179,11 +182,15 @@ term-chameleon status --json
 
 `config-example` prints a commented TOML file. `config-check` validates value types, preset names, region shape, and unknown sections/keys. `watch-live`, `install-watch-daemon`, and `setup` accept `--config`; explicit CLI flags override config values.
 
-Install a balanced preset into a target directory:
+Install a balanced preset into a target directory (and remove it when no longer needed):
 
 ```bash
 term-chameleon install --target-dir /tmp/iterm-dynamic-profiles --name "Adaptive Glass"
+term-chameleon uninstall --target-dir /tmp/iterm-dynamic-profiles --dry-run
+term-chameleon uninstall --target-dir /tmp/iterm-dynamic-profiles
 ```
+
+`uninstall` removes the Dynamic Profile JSON and the make-default AutoLaunch script written by `install`. It creates a backup by default unless `--no-backup` is passed.
 
 Install an iTerm2 AutoLaunch script that starts the live watcher whenever iTerm2 launches:
 
@@ -259,7 +266,7 @@ term-chameleon osc apply balanced --shell
 term-chameleon osc reset
 ```
 
-`osc apply <preset> --write` writes raw OSC 10/11/4 escape sequences directly to stdout for any OSC-capable terminal. Use `--tmux` inside a tmux session or `--shell` to get a printf-safe command. `terminal-info` reports the detected terminal type and capability flags.
+`osc apply <preset> --write` writes raw OSC 10/11/12/4 escape sequences directly to stdout for any OSC-capable terminal. Use `--tmux` inside a tmux session or `--shell` to get a printf-safe command. `terminal-info` reports the detected terminal type and capability flags.
 
 Run the mode risk-classifier and hysteresis simulator:
 

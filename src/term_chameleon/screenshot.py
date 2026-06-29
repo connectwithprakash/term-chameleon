@@ -25,13 +25,20 @@ def capture_screen(output_path: str | Path, *, timeout: float = 10.0) -> Screens
     if command is None:
         return ScreenshotResult(False, False, target, "macOS screencapture command not found")
     target.parent.mkdir(parents=True, exist_ok=True)
-    completed = subprocess.run(
-        [command, "-x", str(target)],
-        check=False,
-        text=True,
-        capture_output=True,
-        timeout=timeout,
-    )
+    try:
+        completed = subprocess.run(
+            [command, "-x", str(target)],
+            check=False,
+            text=True,
+            capture_output=True,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        return ScreenshotResult(
+            True, False, target, f"screencapture timed out after {timeout:.0f}s"
+        )
+    except OSError as exc:
+        return ScreenshotResult(True, False, target, f"screencapture process error: {exc}")
     if completed.returncode == 0 and target.exists() and target.stat().st_size > 0:
         return ScreenshotResult(
             True, True, target, f"captured screenshot: {target}", completed.returncode

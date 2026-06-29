@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .diagnostics import diagnose
+from .install import PROFILE_BACKUP_DIR
 from .iterm_profile import dumps_document, load_profile
 from .presets import apply_preset_to_profile_dict, get_preset
 from .safe_io import atomic_write_text, backup_file
@@ -34,7 +35,7 @@ def apply_mode(
     if not yes:
         raise ValueError("refusing to write without --yes or --dry-run")
     target = Path(path)
-    backup_file(target)
+    backup_file(target, dest_dir=PROFILE_BACKUP_DIR)
     atomic_write_text(target, dumps_document(profile.document))
     return changes, remaining
 

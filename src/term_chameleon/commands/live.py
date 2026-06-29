@@ -14,7 +14,7 @@ def osc(action: str, preset: str, *, tmux: bool, shell: bool, write: bool = Fals
     if write:
         from ..terminal import apply_osc_to_terminal
 
-        apply_osc_to_terminal(preset, reset=(action == "reset"))
+        apply_osc_to_terminal(preset, reset=(action == "reset"), tmux=tmux)
         return 0
     sequences = reset_sequences() if action == "reset" else sequences_for_preset(preset)
     if shell:

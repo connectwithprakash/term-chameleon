@@ -67,17 +67,24 @@ def detect_terminal() -> TerminalInfo:
     )
 
 
-def apply_osc_to_terminal(preset_name: str, *, reset: bool = False) -> bool:
+def apply_osc_to_terminal(preset_name: str, *, reset: bool = False, tmux: bool = False) -> bool:
     """Apply OSC color sequences to the current terminal.
 
     This works universally across iTerm2, Kitty, Ghostty, and Alacritty.
+    Pass ``tmux=True`` inside a tmux session to wrap each sequence with the
+    DCS passthrough escape so it reaches the outer terminal.
     Returns True if sequences were written to stdout.
     Raises OSError if output to stdout fails.
     """
+    from .osc import tmux_wrap
+
     seqs = reset_sequences() if reset else sequences_for_preset(preset_name)
 
-    # Write raw escape sequences directly to stdout.
-    payload = "".join(s.sequence for s in seqs)
+    # Wrap each sequence for tmux DCS passthrough when requested.
+    if tmux:
+        payload = "".join(tmux_wrap(s.sequence) for s in seqs)
+    else:
+        payload = "".join(s.sequence for s in seqs)
 
     try:
         sys.stdout.write(payload)

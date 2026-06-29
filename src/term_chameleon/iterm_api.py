@@ -118,6 +118,11 @@ def _color_assignment_lines(preset: Preset) -> str:
 
 def setter_mappings(preset: Preset) -> list[tuple[str, str | float | bool]]:
     return [
+        # Disable Light/Dark-mode splitting first so the base-color setters below
+        # are the ones iTerm2 actually renders.  Mirrors the profile-dict path in
+        # apply_preset_to_profile_dict (presets.py), which sets
+        # "Use Separate Colors for Light and Dark Mode" = False for the same reason.
+        ("set_use_separate_colors_for_light_and_dark_mode", False),
         ("set_background_color", preset.background.to_hex()),
         ("set_foreground_color", preset.foreground.to_hex()),
         ("set_bold_color", preset.bold.to_hex()),

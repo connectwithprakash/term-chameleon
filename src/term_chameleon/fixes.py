@@ -68,6 +68,12 @@ def apply_balanced_fix(profile: ItermProfile) -> list[Change]:
         BALANCED["minimum_contrast"],
         "Let iTerm2 rescue low-contrast foreground colors.",
     )
+    set_value(
+        "Only The Default BG Color Uses Transparency",
+        BALANCED["only_default_bg_transparent"],
+        "Keep empty cells glassy while colored cells stay opaque"
+        " (worst-case-background readability).",
+    )
     return changes
 
 

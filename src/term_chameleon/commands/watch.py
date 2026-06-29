@@ -66,6 +66,26 @@ def watch_live(
     if not dry_run and not yes:
         print("Refusing to mutate iTerm2 without --yes. Use --dry-run to preview.", file=sys.stderr)
         return 2
+    if not dry_run:
+        # watch-live applies via the iTerm2 Python API; it cannot drive OSC-only
+        # terminals.  Detect early so the user gets a clear message instead of a
+        # silent no-op (the loop would catch every apply RuntimeError and log
+        # "apply failed; will continue watching" with applied=False forever).
+        # demo_cycle uses the same iTerm2 apply path, so the guard applies there
+        # too — otherwise --demo-cycle --yes silently loops without changing any
+        # colors on Kitty, Ghostty, or Alacritty.
+        from ..terminal import detect_terminal
+
+        term = detect_terminal()
+        if not term.is_iterm2:
+            print(
+                f"watch-live live adaptation requires iTerm2 "
+                f"(detected terminal: {term.name!r}). "
+                f"For Kitty, Ghostty, or Alacritty use: "
+                f"term-chameleon osc apply <preset> --write",
+                file=sys.stderr,
+            )
+            return 2
     cfg = load_config(config)
     watch_cfg = merged_section(cfg, "watch")
     resolved_region = region if region is not None else str_value(value(watch_cfg, "region"))

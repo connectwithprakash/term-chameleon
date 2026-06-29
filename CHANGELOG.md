@@ -10,9 +10,10 @@
 - "Only the default background uses transparency" is now applied by every preset, so a
   bright/colored backdrop cannot bleed through a colored cell and bury its text while empty
   space stays glassy. Wired through the profile dict, live setters, and the generated adapter.
-- Optional true-backdrop capture: `[sck]` extra (ScreenCaptureKit) captures the backdrop
-  excluding the terminal window for a more accurate adaptation decision; falls back to
-  `screencapture` automatically. New `backdrop-info` command reports the active backend.
+- Optional `[sck]` extra (ScreenCaptureKit): installs the package and reports readiness
+  for a planned true-backdrop capture that will exclude the terminal window; the watcher
+  currently still uses the `screencapture` composite grab in all cases. New `backdrop-info`
+  command reports the detected backend and SCK readiness.
 - docs/design-adaptive-readability.md: the design of record, including why true per-glyph
   correction is impossible through terminal controls (a macOS composition limit) and the
   worst-case-background strategy adopted instead.
@@ -31,8 +32,8 @@
   auto-adapts on a timer (for demos and validation). Applies an exaggerated
   demo-only background per mode so the switch is obvious on an opaque window;
   the real presets are unchanged.
-- `demo` command: applies each preset to the live session in turn so you can
-  watch the colors shift.
+- `demo` command: applies a representative range of presets to the live session
+  in turn so you can watch the colors shift.
 - VHS-rendered CLI demo GIF (`demo/demo.gif`) embedded in the README, with a
   workflow that regenerates it from `demo/demo.tape`.
 

@@ -18,8 +18,9 @@ def demo(
     hold: float = DEFAULT_HOLD_SECONDS,
     sleep=time.sleep,
 ) -> int:
-    """Apply each readability preset to the live iTerm2 session in turn, holding
-    between each so the recoloring is visible in the frontmost iTerm2 window.
+    """Apply a representative range of readability presets to the live iTerm2 session
+    in turn, holding between each so the recoloring is visible in the frontmost iTerm2
+    window. (Runs the curated DEMO_SEQUENCE subset, not every preset.)
 
     This is a guided live walkthrough, not a screenshotter: macOS only lets a
     tool screenshot the active Space, so capturing the terminal reliably is the
@@ -31,7 +32,7 @@ def demo(
     if unknown:
         raise ValueError(f"unknown preset(s): {', '.join(unknown)}")
 
-    print("Watch your iTerm2 window. Applying each preset live:")
+    print("Watch your iTerm2 window. Applying a representative range of presets:")
     applied = 0
     for preset in presets:
         try:

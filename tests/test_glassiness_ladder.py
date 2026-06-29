@@ -61,3 +61,18 @@ def test_min_contrast_applied_on_every_rung():
         mapping = dict(setter_mappings(preset))
         assert mapping["set_minimum_contrast"] == preset.minimum_contrast
         assert preset.minimum_contrast > 0
+
+
+def test_only_default_bg_key_written_by_apply_balanced_fix():
+    """apply_balanced_fix must set the only-default-bg-transparent key — mirror of
+    the profile-dict and live-adapter paths so the ``fix`` command does not silently
+    omit a readability protection that every other write path provides."""
+    from term_chameleon.fixes import apply_balanced_fix
+    from term_chameleon.iterm_profile import ItermProfile
+
+    document: dict = {"Profiles": [{"Guid": "test-guid"}]}
+    profile = ItermProfile(path=None, document=document, profile=document["Profiles"][0])
+    changes = apply_balanced_fix(profile)
+    assert profile.profile[ONLY_DEFAULT_BG_KEY] is True
+    changed_keys = {c.key for c in changes}
+    assert ONLY_DEFAULT_BG_KEY in changed_keys

@@ -18,6 +18,14 @@ DEFAULT_AUTOLAUNCH_DIR = (
 DEFAULT_APP_STATE_DIR = Path.home() / "Library" / "Application Support" / "term-chameleon"
 AUTOLAUNCH_FILENAME = "term_chameleon_default_profile.py"
 
+# Backups of files inside iTerm2-scanned directories (DynamicProfiles, AutoLaunch) must
+# NOT stay in those directories — iTerm2 tries to load every file it finds there.
+# DynamicProfiles loads .json files; AutoLaunch runs every file, including stray .backup.*
+# files, and triggers an error dialog.  Route backups to a dedicated app-state subdir,
+# mirroring the pattern in watch_daemon.py (SCRIPT_BACKUP_DIR).
+PROFILE_BACKUP_DIR = DEFAULT_APP_STATE_DIR / "profile-backups"
+AUTOLAUNCH_BACKUP_DIR = DEFAULT_APP_STATE_DIR / "autolaunch-backups"
+
 
 def _guid_for_name(name: str) -> str:
     """Derive a stable, unique GUID from a profile name via truncated SHA-1.
@@ -65,7 +73,7 @@ def install_profile(
         if target.exists():
             existing = target.read_text(encoding="utf-8")
             if existing != content:
-                backup_file(target)
+                backup_file(target, dest_dir=PROFILE_BACKUP_DIR)
                 atomic_write_text(target, content)
             # Byte-identical content: skip backup and write (idempotent re-install).
         else:
@@ -158,7 +166,7 @@ def install_autolaunch_script(
         if target.exists():
             existing = target.read_text(encoding="utf-8")
             if existing != content:
-                backup_file(target)
+                backup_file(target, dest_dir=AUTOLAUNCH_BACKUP_DIR)
                 atomic_write_text(target, content)
             # Byte-identical content: skip backup and write (idempotent re-install).
         else:
@@ -210,13 +218,13 @@ def uninstall_profile(
     profile_removed = profile_target.exists()
     if profile_removed and not dry_run:
         if backup:
-            profile_backup = backup_file(profile_target)
+            profile_backup = backup_file(profile_target, dest_dir=PROFILE_BACKUP_DIR)
         profile_target.unlink()
 
     autolaunch_removed = autolaunch_target.exists()
     if autolaunch_removed and not dry_run:
         if backup:
-            autolaunch_backup = backup_file(autolaunch_target)
+            autolaunch_backup = backup_file(autolaunch_target, dest_dir=AUTOLAUNCH_BACKUP_DIR)
         autolaunch_target.unlink()
 
     # Read the persisted previous-default GUID recorded by the AutoLaunch script.

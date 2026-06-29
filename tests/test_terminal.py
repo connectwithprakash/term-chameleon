@@ -87,3 +87,14 @@ def test_apply_osc_to_terminal_flush_error():
                 apply_osc_to_terminal("balanced")
     assert "Failed to write OSC sequences to terminal" in str(exc_info.value)
     assert "flush error" in str(exc_info.value)
+
+
+def test_apply_osc_to_terminal_tmux_wraps_sequences(capsys):
+    """--write --tmux must wrap each sequence with the DCS passthrough prefix so
+    tmux forwards it to the outer terminal instead of intercepting it."""
+    apply_osc_to_terminal("balanced", tmux=True)
+    captured = capsys.readouterr()
+    # Every sequence must be DCS-wrapped; bare OSC must not appear at the top level.
+    assert "\x1bPtmux;" in captured.out
+    # The raw OSC sequences should not appear unwrapped at the start of output.
+    assert not captured.out.startswith("\x1b]")

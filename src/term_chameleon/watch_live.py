@@ -18,14 +18,25 @@ from .iterm_window import WindowBoundsResult, get_iterm_window_bounds
 from .live_iterm import LiveApplyResult, apply_preset_to_current_session
 from .screenshot import capture_screen
 from .screenshot_test import analyze_image_file
-from .watch import ModeSelector, Sample
+from .watch import HIGH_RISK, ModeSelector, Sample
 
 WATCH_SAMPLE_MAX_PIXELS = 250_000
 WATCH_ANALYSIS_MAX_DIMENSION = 700
 WATCH_MAX_ARTIFACTS = 200
-# Risk classifications where text is actively washing out; a switch into one of
-# these overrides the anti-thrash cooldown so readability is restored at once.
-HIGH_RISK = frozenset({"bright-high-risk", "high-variance-high-risk"})
+
+
+class _WatchStopSentinel(BaseException):
+    """Raised by test-injected sample providers to stop the loop without being
+    swallowed by the transient-failure recovery path.
+
+    Using BaseException keeps it outside the ``except Exception`` safety net
+    that guards against transient sample failures so tests can still stop the
+    loop reliably with a dedicated sentinel.
+    """
+
+
+# Re-exported from watch for backward compatibility; the authoritative definition
+# lives in watch.HIGH_RISK so both anti-thrash gates share the same set.
 # Maximum events kept in memory for the return value (ring buffer).
 # The daemon runs indefinitely; storing all events would exhaust RAM.
 WATCH_MAX_EVENTS_BUFFER = 1000
@@ -262,7 +273,31 @@ def run_watch_live(
         if now - start > config.duration and events:
             break
         index += 1
-        sample, source = sample_provider(index, config.output_dir, region)
+        try:
+            sample, source = sample_provider(index, config.output_dir, region)
+        except Exception as exc:
+            logger.warning(
+                "%d: sample failed; will continue watching: %s",
+                index,
+                exc,
+            )
+            events.append(
+                WatchLiveEvent(
+                    index=index,
+                    elapsed=now - start,
+                    luminance=0.0,
+                    variance=0.0,
+                    risk="unknown",
+                    mode=selector.current_mode,
+                    candidate_mode=selector.current_mode,
+                    switched=False,
+                    applied=False,
+                    reason="sample-failed",
+                    message=f"sample failed; will continue watching: {exc}",
+                )
+            )
+            sleep(config.interval)
+            continue
         _prune_artifacts(config.output_dir)
         previous_mode = selector.current_mode
         previous_last_switch_luminance = selector._last_switch_luminance

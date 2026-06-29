@@ -175,13 +175,45 @@ def config_example(*, output: Path | None) -> int:
     return 0
 
 
-def config_check(*, config: Path, json_output: bool) -> int:
-    loaded = load_config(config)
-    validation = validate_config(loaded, path=config)
+def config_check(*, config: Path | None, json_output: bool) -> int:
+    from ..config import DEFAULT_CONFIG_PATH
+
+    if config is None:
+        # No explicit --config given.  If the default path does not exist this is
+        # a fresh install, not a user error: return 0 with guidance.
+        effective = Path(DEFAULT_CONFIG_PATH).expanduser()
+        if not effective.exists():
+            msg = (
+                f"No config file found at {effective}. "
+                "Run `term-chameleon config-example --output <path>` to create one."
+            )
+            if json_output:
+                print(
+                    json.dumps(
+                        {
+                            "passed": True,
+                            "sections": [],
+                            "errors": [],
+                            "warnings": [msg],
+                            "path": str(effective),
+                        },
+                        indent=2,
+                    )
+                )
+            else:
+                print(f"[info] {msg}")
+            return 0
+    else:
+        effective = Path(config).expanduser()
+
+    # load_config raises ConfigError (a ValueError subclass) if the file is not
+    # found; the CLI handler at cli.py catches ValueError and returns exit 2.
+    loaded = load_config(effective)
+    validation = validate_config(loaded, path=effective)
     if json_output:
         print(json.dumps(validation.as_dict(), indent=2))
     else:
-        print(f"Config: {Path(config).expanduser()}")
+        print(f"Config: {effective}")
         print(f"Sections: {', '.join(validation.sections) if validation.sections else '(none)'}")
         for warning in validation.warnings:
             print(f"[warn] {warning}")

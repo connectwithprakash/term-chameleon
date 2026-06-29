@@ -2,6 +2,8 @@ import json
 import shutil
 from pathlib import Path
 
+import term_chameleon.install as install_module
+import term_chameleon.modes as modes_module
 from term_chameleon.cli import main
 from term_chameleon.install import (
     _guid_for_name,
@@ -35,11 +37,14 @@ def test_install_command_writes_profile(tmp_path, capsys):
     assert loads_document(written.read_text()).name == "Test Glass"
 
 
-def test_install_existing_profile_creates_backup(tmp_path):
+def test_install_existing_profile_creates_backup(tmp_path, monkeypatch):
+    backup_dir = tmp_path / "profile-backups"
+    monkeypatch.setattr(install_module, "PROFILE_BACKUP_DIR", backup_dir)
     assert main(["install", "--target-dir", str(tmp_path), "--name", "One"]) == 0
     assert main(["install", "--target-dir", str(tmp_path), "--name", "Two"]) == 0
-    backups = list(tmp_path.glob("term-chameleon-adaptive-glass.json.backup.*"))
-    assert len(backups) == 1
+    # Backup must land in the dedicated backup dir, NOT in the scanned profiles dir.
+    assert not list(tmp_path.glob("term-chameleon-adaptive-glass.json.backup.*"))
+    assert list(backup_dir.glob("term-chameleon-adaptive-glass.json.backup.*"))
     assert (
         loads_document((tmp_path / "term-chameleon-adaptive-glass.json").read_text()).name == "Two"
     )
@@ -77,7 +82,9 @@ def test_autolaunch_script_dry_run_compiles(tmp_path):
     assert not target.exists()
 
 
-def test_apply_mode_to_profile_copy(tmp_path):
+def test_apply_mode_to_profile_copy(tmp_path, monkeypatch):
+    backup_dir = tmp_path / "profile-backups"
+    monkeypatch.setattr(modes_module, "PROFILE_BACKUP_DIR", backup_dir)
     target = tmp_path / "profile.json"
     shutil.copy2(FIXTURES / "good-dark-glass.json", target)
     changes, remaining = apply_mode(target, "presentation", dry_run=False, yes=True)
@@ -85,15 +92,19 @@ def test_apply_mode_to_profile_copy(tmp_path):
     assert not [d for d in remaining if d.severity == "fail"]
     profile = load_profile(target)
     assert profile.transparency() == 0.0
-    assert list(tmp_path.glob("profile.json.backup.*"))
+    # Backup must land in the dedicated backup dir, not next to the profile.
+    assert not list(tmp_path.glob("profile.json.backup.*"))
+    assert list(backup_dir.glob("profile.json.backup.*"))
 
 
-def test_repeated_mode_writes_create_unique_backups(tmp_path):
+def test_repeated_mode_writes_create_unique_backups(tmp_path, monkeypatch):
+    backup_dir = tmp_path / "profile-backups"
+    monkeypatch.setattr(modes_module, "PROFILE_BACKUP_DIR", backup_dir)
     target = tmp_path / "profile.json"
     shutil.copy2(FIXTURES / "good-dark-glass.json", target)
     apply_mode(target, "presentation", dry_run=False, yes=True)
     apply_mode(target, "balanced", dry_run=False, yes=True)
-    assert len(list(tmp_path.glob("profile.json.backup.*"))) == 2
+    assert len(list(backup_dir.glob("profile.json.backup.*"))) == 2
 
 
 def test_mode_command_requires_yes_or_dry_run(capsys):
@@ -203,43 +214,58 @@ def test_profile_document_explicit_guid_is_respected():
 # --- Fix: skip backup when re-install content is byte-identical ---
 
 
-def test_identical_reinstall_does_not_create_backup(tmp_path):
+def test_identical_reinstall_does_not_create_backup(tmp_path, monkeypatch):
     """Installing the same profile twice must not create a backup on the second install."""
+    backup_dir = tmp_path / "profile-backups"
+    monkeypatch.setattr(install_module, "PROFILE_BACKUP_DIR", backup_dir)
     install_profile(target_dir=tmp_path, name="Glass")
     install_profile(target_dir=tmp_path, name="Glass")
-    backups = list(tmp_path.glob("term-chameleon-adaptive-glass.json.backup.*"))
-    assert len(backups) == 0
+    # No backup in the scanned dir or the backup dir.
+    assert not list(tmp_path.glob("term-chameleon-adaptive-glass.json.backup.*"))
+    assert not list(backup_dir.glob("*.backup.*"))
 
 
-def test_changed_reinstall_creates_backup(tmp_path):
-    """Installing a different profile name should produce a backup."""
+def test_changed_reinstall_creates_backup(tmp_path, monkeypatch):
+    """Installing a different profile name should produce a backup in the backup dir."""
+    backup_dir = tmp_path / "profile-backups"
+    monkeypatch.setattr(install_module, "PROFILE_BACKUP_DIR", backup_dir)
     install_profile(target_dir=tmp_path, name="First")
     install_profile(target_dir=tmp_path, name="Second")
-    backups = list(tmp_path.glob("term-chameleon-adaptive-glass.json.backup.*"))
-    assert len(backups) == 1
+    # Backup must NOT land in the scanned DynamicProfiles dir.
+    assert not list(tmp_path.glob("term-chameleon-adaptive-glass.json.backup.*"))
+    assert len(list(backup_dir.glob("term-chameleon-adaptive-glass.json.backup.*"))) == 1
 
 
-def test_identical_autolaunch_reinstall_does_not_create_backup(tmp_path):
+def test_identical_autolaunch_reinstall_does_not_create_backup(tmp_path, monkeypatch):
     """Re-installing the same AutoLaunch script must not create a backup."""
+    backup_dir = tmp_path / "autolaunch-backups"
+    monkeypatch.setattr(install_module, "AUTOLAUNCH_BACKUP_DIR", backup_dir)
     install_autolaunch_script(target_dir=tmp_path, profile_name="Glass")
     install_autolaunch_script(target_dir=tmp_path, profile_name="Glass")
-    backups = list(tmp_path.glob("term_chameleon_default_profile.py.backup.*"))
-    assert len(backups) == 0
+    assert not list(tmp_path.glob("term_chameleon_default_profile.py.backup.*"))
+    assert not list(backup_dir.glob("*.backup.*"))
 
 
-def test_changed_autolaunch_reinstall_creates_backup(tmp_path):
+def test_changed_autolaunch_reinstall_creates_backup(tmp_path, monkeypatch):
     """Re-installing AutoLaunch with a different profile name should produce a backup."""
+    backup_dir = tmp_path / "autolaunch-backups"
+    monkeypatch.setattr(install_module, "AUTOLAUNCH_BACKUP_DIR", backup_dir)
     install_autolaunch_script(target_dir=tmp_path, profile_name="First")
     install_autolaunch_script(target_dir=tmp_path, profile_name="Second")
-    backups = list(tmp_path.glob("term_chameleon_default_profile.py.backup.*"))
-    assert len(backups) == 1
+    # Backup must NOT land in the scanned AutoLaunch dir.
+    assert not list(tmp_path.glob("term_chameleon_default_profile.py.backup.*"))
+    assert len(list(backup_dir.glob("term_chameleon_default_profile.py.backup.*"))) == 1
 
 
 # --- Fix: uninstall_profile function ---
 
 
-def test_uninstall_profile_removes_profile_and_script(tmp_path):
+def test_uninstall_profile_removes_profile_and_script(tmp_path, monkeypatch):
     """uninstall_profile removes both the profile JSON and the AutoLaunch script."""
+    profile_backup_dir = tmp_path / "profile-backups"
+    autolaunch_backup_dir = tmp_path / "autolaunch-backups"
+    monkeypatch.setattr(install_module, "PROFILE_BACKUP_DIR", profile_backup_dir)
+    monkeypatch.setattr(install_module, "AUTOLAUNCH_BACKUP_DIR", autolaunch_backup_dir)
     profiles_dir = tmp_path / "profiles"
     autolaunch_dir = tmp_path / "autolaunch"
     state_dir = tmp_path / "state"
@@ -260,6 +286,9 @@ def test_uninstall_profile_removes_profile_and_script(tmp_path):
     assert result.profile_backup_path.exists()
     assert result.autolaunch_backup_path is not None
     assert result.autolaunch_backup_path.exists()
+    # Backups must land in the dedicated backup dirs, not in the scanned dirs.
+    assert not list(profiles_dir.glob("*.backup.*"))
+    assert not list(autolaunch_dir.glob("*.backup.*"))
 
 
 def test_uninstall_profile_never_installed_is_graceful(tmp_path):
@@ -376,3 +405,39 @@ def test_uninstall_profile_partial_install_only_autolaunch(tmp_path):
     assert result.profile_removed is False
     assert result.autolaunch_removed is True
     assert not result.autolaunch_target.exists()
+
+
+def test_backup_does_not_land_in_profiles_or_autolaunch_dir(tmp_path, monkeypatch):
+    """Backups from install/uninstall must never land in iTerm2-scanned directories.
+
+    DynamicProfiles and AutoLaunch are scanned by iTerm2 on launch; a stray
+    .backup.* file in AutoLaunch triggers an error dialog.  Mirrors the
+    invariant already enforced for watch_daemon.py (test_watch_daemon.py).
+    """
+    profile_backup_dir = tmp_path / "profile-backups"
+    autolaunch_backup_dir = tmp_path / "autolaunch-backups"
+    monkeypatch.setattr(install_module, "PROFILE_BACKUP_DIR", profile_backup_dir)
+    monkeypatch.setattr(install_module, "AUTOLAUNCH_BACKUP_DIR", autolaunch_backup_dir)
+
+    profiles_dir = tmp_path / "profiles"
+    autolaunch_dir = tmp_path / "autolaunch"
+
+    # Install, reinstall (triggers profile backup), then uninstall (triggers both).
+    install_profile(target_dir=profiles_dir, name="A")
+    install_autolaunch_script(target_dir=autolaunch_dir, profile_name="A")
+    install_profile(target_dir=profiles_dir, name="B")
+    install_autolaunch_script(target_dir=autolaunch_dir, profile_name="B")
+    uninstall_profile(
+        target_dir=profiles_dir,
+        autolaunch_dir=autolaunch_dir,
+        app_state_dir=tmp_path / "state",
+        dry_run=False,
+        backup=True,
+    )
+
+    # No .backup.* files may remain in the iTerm2-scanned directories.
+    assert not list(profiles_dir.glob("*.backup.*")), "backup landed in DynamicProfiles dir"
+    assert not list(autolaunch_dir.glob("*.backup.*")), "backup landed in AutoLaunch dir"
+    # Backups must exist in the dedicated dirs.
+    assert list(profile_backup_dir.glob("*.backup.*"))
+    assert list(autolaunch_backup_dir.glob("*.backup.*"))

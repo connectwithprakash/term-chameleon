@@ -14,6 +14,7 @@ from term_chameleon.watch_live import (
     WATCH_MAX_EVENTS_BUFFER,
     WatchLiveConfig,
     _setup_pid_ownership,
+    _WatchStopSentinel,
     run_watch_live,
 )
 
@@ -154,7 +155,9 @@ def test_run_watch_live_returns_bounded_ring_buffer(tmp_path):
 
     def counting_provider(index: int, output_dir: Path, region):
         if index > n:
-            raise RuntimeError("stop sentinel")
+            # Use the dedicated stop sentinel (BaseException subclass) so the
+            # loop-level except-Exception recovery path does not swallow it.
+            raise _WatchStopSentinel("stop sentinel")
         return sample_list[index - 1], f"s{index}"
 
     try:
@@ -172,14 +175,11 @@ def test_run_watch_live_returns_bounded_ring_buffer(tmp_path):
             sleep=clock.sleep,
             clock=clock,
         )
-    except RuntimeError as exc:
+    except _WatchStopSentinel as exc:
         if "stop sentinel" not in str(exc):
             raise
-        # The RuntimeError was raised by our sentinel after n iterations;
-        # because run_watch_live does not catch provider RuntimeErrors we
-        # cannot inspect the return value here. The test passes as long as
-        # the bounded deque design is in place (confirmed by the deque maxlen
-        # constant WATCH_MAX_EVENTS_BUFFER used in run_watch_live).
+        # The sentinel was raised by our provider after n iterations; the bounded
+        # deque design is confirmed by the WATCH_MAX_EVENTS_BUFFER constant.
     else:
         assert len(events) <= WATCH_MAX_EVENTS_BUFFER, (
             f"expected at most {WATCH_MAX_EVENTS_BUFFER} events, got {len(events)}"
@@ -374,6 +374,43 @@ def test_watch_live_continues_when_live_apply_fails(tmp_path):
     assert events[0].applied is False
     assert "apply failed; will continue watching" in events[0].message
     assert events[1].switched is False
+
+
+def test_watch_live_continues_when_sample_provider_raises(tmp_path):
+    """A transient sample-provider failure must not kill the long-lived daemon.
+
+    run_watch_live must log a warning, append a 'sample failed' event, and
+    continue the loop — mirroring the apply-side resilience at the sample seam.
+    """
+    call_count = [0]
+
+    def provider(index: int, _output_dir: Path, _region):
+        call_count[0] += 1
+        if index == 1:
+            raise RuntimeError("screencapture timed out after 10s")
+        return Sample(0.5), f"sample-{index}"
+
+    clock = FakeClock()
+    events = run_watch_live(
+        WatchLiveConfig(
+            interval=1,
+            duration=1,
+            stable=1,
+            cooldown=10,
+            output_dir=tmp_path,
+            dry_run=True,
+            initial_mode="balanced",
+        ),
+        sample_provider=provider,
+        sleep=clock.sleep,
+        clock=clock,
+    )
+    # Both iterations must produce events; iteration 1 is the failed sample.
+    assert len(events) >= 2
+    failed = events[0]
+    assert failed.applied is False
+    assert "sample failed; will continue watching" in failed.message
+    assert failed.reason == "sample-failed"
 
 
 def test_watch_live_cooldown_holds_second_switch(tmp_path):

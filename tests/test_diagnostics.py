@@ -3,6 +3,7 @@ from pathlib import Path
 from term_chameleon.diagnostics import diagnose
 from term_chameleon.fixes import apply_balanced_fix
 from term_chameleon.iterm_profile import load_profile
+from term_chameleon.presets import COLOR_FIELD_MAP
 
 FIXTURES = Path(__file__).parent / "fixtures" / "iterm"
 
@@ -107,3 +108,29 @@ def test_balanced_fix_removes_failures():
     assert changes
     remaining = diagnose(profile)
     assert not [d for d in remaining if d.severity == "fail"]
+
+
+def test_malformed_color_diagnostics_cover_all_color_field_map_keys(tmp_path):
+    """diagnose() must emit a MALFORMED_* diagnostic for every key in COLOR_FIELD_MAP
+    when that key holds a malformed color dict.  This ensures the malformed-key
+    loop is derived from COLOR_FIELD_MAP (the single source of truth) and will
+    not drift if a new color key is added there.
+    """
+    import json
+
+    source = json.loads((FIXTURES / "good-dark-glass.json").read_text())
+    p = source["Profiles"][0]
+    bad_color = {"Red Component": "not-a-float", "Green Component": 0, "Blue Component": 0}
+    for key in COLOR_FIELD_MAP:
+        p[key] = bad_color
+
+    target = tmp_path / "all-malformed.json"
+    target.write_text(json.dumps(source))
+    profile = load_profile(target)
+    diagnostic_codes = {d.code for d in diagnose(profile)}
+
+    for key in COLOR_FIELD_MAP:
+        expected_code = "MALFORMED_" + key.upper().replace(" ", "_")
+        assert expected_code in diagnostic_codes, (
+            f"expected diagnostic {expected_code!r} for COLOR_FIELD_MAP key {key!r}"
+        )

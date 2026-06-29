@@ -5,7 +5,6 @@ from pathlib import Path
 
 import pytest
 
-from term_chameleon.color import Color
 from term_chameleon.diagnostics import diagnose
 from term_chameleon.iterm_profile import color_hex, loads_document
 
@@ -266,6 +265,171 @@ def test_diagnose_malformed_fg_emits_malformed_foreground_color():
 
 
 # ---------------------------------------------------------------------------
+# minimum_contrast / transparency — defensive coercion (Finding 1)
+# ---------------------------------------------------------------------------
+
+
+def test_minimum_contrast_returns_none_for_absent_key():
+    """minimum_contrast() returns None when key is absent."""
+    profile = loads_document(MINIMAL_PROFILE_JSON)
+    assert profile.minimum_contrast() is None
+
+
+def test_minimum_contrast_returns_float_for_valid_value():
+    """minimum_contrast() returns a float for a well-formed numeric value."""
+    profile_json = json.dumps({"Profiles": [{"Name": "T", "Guid": "g", "Minimum Contrast": 0.35}]})
+    profile = loads_document(profile_json)
+    assert profile.minimum_contrast() == pytest.approx(0.35)
+
+
+def test_minimum_contrast_returns_none_for_string():
+    """minimum_contrast() returns None (not raises) for a non-numeric string value."""
+    profile_json = json.dumps(
+        {"Profiles": [{"Name": "T", "Guid": "g", "Minimum Contrast": "not-a-number"}]}
+    )
+    profile = loads_document(profile_json)
+    assert profile.minimum_contrast() is None
+
+
+def test_minimum_contrast_returns_none_for_list():
+    """minimum_contrast() returns None for a list value."""
+    profile_json = json.dumps(
+        {"Profiles": [{"Name": "T", "Guid": "g", "Minimum Contrast": [0.35]}]}
+    )
+    profile = loads_document(profile_json)
+    assert profile.minimum_contrast() is None
+
+
+def test_is_minimum_contrast_malformed_absent_returns_false():
+    """is_minimum_contrast_malformed() returns False when key is absent."""
+    profile = loads_document(MINIMAL_PROFILE_JSON)
+    assert profile.is_minimum_contrast_malformed() is False
+
+
+def test_is_minimum_contrast_malformed_valid_returns_false():
+    """is_minimum_contrast_malformed() returns False for a valid numeric value."""
+    profile_json = json.dumps({"Profiles": [{"Name": "T", "Guid": "g", "Minimum Contrast": 0.35}]})
+    profile = loads_document(profile_json)
+    assert profile.is_minimum_contrast_malformed() is False
+
+
+def test_is_minimum_contrast_malformed_string_returns_true():
+    """is_minimum_contrast_malformed() returns True for a non-numeric string."""
+    profile_json = json.dumps({"Profiles": [{"Name": "T", "Guid": "g", "Minimum Contrast": "bad"}]})
+    profile = loads_document(profile_json)
+    assert profile.is_minimum_contrast_malformed() is True
+
+
+def test_transparency_returns_none_for_absent_key():
+    """transparency() returns None when key is absent."""
+    profile = loads_document(MINIMAL_PROFILE_JSON)
+    assert profile.transparency() is None
+
+
+def test_transparency_returns_float_for_valid_value():
+    """transparency() returns a float for a well-formed numeric value."""
+    profile_json = json.dumps({"Profiles": [{"Name": "T", "Guid": "g", "Transparency": 0.08}]})
+    profile = loads_document(profile_json)
+    assert profile.transparency() == pytest.approx(0.08)
+
+
+def test_transparency_returns_none_for_string():
+    """transparency() returns None (not raises) for a non-numeric string value."""
+    profile_json = json.dumps(
+        {"Profiles": [{"Name": "T", "Guid": "g", "Transparency": "not-a-number"}]}
+    )
+    profile = loads_document(profile_json)
+    assert profile.transparency() is None
+
+
+def test_is_transparency_malformed_absent_returns_false():
+    """is_transparency_malformed() returns False when key is absent."""
+    profile = loads_document(MINIMAL_PROFILE_JSON)
+    assert profile.is_transparency_malformed() is False
+
+
+def test_is_transparency_malformed_string_returns_true():
+    """is_transparency_malformed() returns True for a non-numeric string."""
+    profile_json = json.dumps(
+        {"Profiles": [{"Name": "T", "Guid": "g", "Transparency": "not-a-number"}]}
+    )
+    profile = loads_document(profile_json)
+    assert profile.is_transparency_malformed() is True
+
+
+def test_diagnose_emits_malformed_transparency():
+    """diagnose() must emit MALFORMED_TRANSPARENCY when Transparency is a string."""
+    profile_json = json.dumps(
+        {
+            "Profiles": [
+                {
+                    "Name": "Bad",
+                    "Guid": "guid-bad",
+                    "Transparency": "not-a-number",
+                }
+            ]
+        }
+    )
+    profile = loads_document(profile_json)
+    codes = {d.code for d in diagnose(profile)}
+    assert "MALFORMED_TRANSPARENCY" in codes
+
+
+def test_diagnose_emits_malformed_minimum_contrast():
+    """diagnose() must emit MALFORMED_MINIMUM_CONTRAST when Minimum Contrast is a string."""
+    profile_json = json.dumps(
+        {
+            "Profiles": [
+                {
+                    "Name": "Bad",
+                    "Guid": "guid-bad2",
+                    "Minimum Contrast": "bad",
+                }
+            ]
+        }
+    )
+    profile = loads_document(profile_json)
+    codes = {d.code for d in diagnose(profile)}
+    assert "MALFORMED_MINIMUM_CONTRAST" in codes
+
+
+def test_diagnose_malformed_transparency_is_fail_severity():
+    """MALFORMED_TRANSPARENCY diagnostic must have severity='fail'."""
+    profile_json = json.dumps(
+        {
+            "Profiles": [
+                {
+                    "Name": "Bad",
+                    "Guid": "guid-bad3",
+                    "Transparency": "not-a-number",
+                }
+            ]
+        }
+    )
+    profile = loads_document(profile_json)
+    diags = {d.code: d for d in diagnose(profile)}
+    assert diags["MALFORMED_TRANSPARENCY"].severity == "fail"
+
+
+def test_diagnose_malformed_minimum_contrast_is_fail_severity():
+    """MALFORMED_MINIMUM_CONTRAST diagnostic must have severity='fail'."""
+    profile_json = json.dumps(
+        {
+            "Profiles": [
+                {
+                    "Name": "Bad",
+                    "Guid": "guid-bad4",
+                    "Minimum Contrast": [0.5],
+                }
+            ]
+        }
+    )
+    profile = loads_document(profile_json)
+    diags = {d.code: d for d in diagnose(profile)}
+    assert diags["MALFORMED_MINIMUM_CONTRAST"].severity == "fail"
+
+
+# ---------------------------------------------------------------------------
 # Fix: loads_document raises ValueError on non-dict JSON root
 # ---------------------------------------------------------------------------
 
@@ -298,87 +462,6 @@ def test_loads_document_raises_on_boolean_root():
     """loads_document must raise ValueError for a JSON boolean root."""
     with pytest.raises(ValueError, match="root must be an object"):
         loads_document("true")
-
-
-# ---------------------------------------------------------------------------
-# Fix: set_color preserves original Color Space and unknown extra keys
-# ---------------------------------------------------------------------------
-
-
-def _p3_profile_json() -> str:
-    """A minimal profile with a P3 Background Color."""
-    return json.dumps(
-        {
-            "Profiles": [
-                {
-                    "Name": "P3 Test",
-                    "Guid": "guid-p3",
-                    "Background Color": {
-                        "Color Space": "P3",
-                        "Red Component": 0.1,
-                        "Green Component": 0.2,
-                        "Blue Component": 0.3,
-                        "Alpha Component": 1.0,
-                        "Extra iTerm Key": "keep-me",
-                    },
-                }
-            ]
-        }
-    )
-
-
-def test_set_color_preserves_color_space():
-    """set_color must not overwrite the original Color Space with sRGB."""
-    profile = loads_document(_p3_profile_json())
-    original_color = profile.color("Background Color")
-    assert original_color is not None
-    profile.set_color("Background Color", original_color)
-    stored = profile.profile["Background Color"]
-    assert stored["Color Space"] == "P3", (
-        f"Color Space was clobbered: expected 'P3', got {stored['Color Space']!r}"
-    )
-
-
-def test_set_color_preserves_unknown_extra_keys():
-    """set_color must preserve unknown extra keys alongside the new component values."""
-    profile = loads_document(_p3_profile_json())
-    original_color = profile.color("Background Color")
-    assert original_color is not None
-    profile.set_color("Background Color", original_color)
-    stored = profile.profile["Background Color"]
-    assert "Extra iTerm Key" in stored, "Extra iTerm Key was dropped by set_color"
-    assert stored["Extra iTerm Key"] == "keep-me"
-
-
-def test_set_color_updates_component_values():
-    """set_color must write the new color component values."""
-    profile = loads_document(_p3_profile_json())
-    new_color = Color(0.9, 0.8, 0.7)
-    profile.set_color("Background Color", new_color)
-    stored = profile.profile["Background Color"]
-    assert stored["Red Component"] == 0.9
-    assert stored["Green Component"] == 0.8
-    assert stored["Blue Component"] == 0.7
-
-
-def test_set_color_on_new_key_uses_srdb_default():
-    """set_color on a key that has no existing dict uses sRGB as Color Space."""
-    profile = loads_document(MINIMAL_PROFILE_JSON)
-    new_color = Color(0.5, 0.5, 0.5)
-    profile.set_color("Foreground Color", new_color)
-    stored = profile.profile["Foreground Color"]
-    assert stored["Color Space"] == "sRGB"
-
-
-def test_set_color_idempotent_round_trip_preserves_space():
-    """Calling set_color(key, color(key)) must be idempotent for Color Space."""
-    profile = loads_document(_p3_profile_json())
-    before = dict(profile.profile["Background Color"])
-    color = profile.color("Background Color")
-    assert color is not None
-    profile.set_color("Background Color", color)
-    after = profile.profile["Background Color"]
-    assert after["Color Space"] == before["Color Space"]
 
 
 # ---------------------------------------------------------------------------

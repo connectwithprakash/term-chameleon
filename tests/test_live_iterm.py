@@ -218,3 +218,29 @@ def test_apply_preset_missing_iterm2_raises_runtime_error(monkeypatch):
 
     with pytest.raises(RuntimeError, match="iterm2 package import failed"):
         apply_preset_to_current_session("dark-glass")
+
+
+# ---------------------------------------------------------------------------
+# No-op path: all setters missing → RuntimeError, not silent applied=True
+# ---------------------------------------------------------------------------
+
+
+def test_apply_preset_raises_when_all_setters_missing(monkeypatch):
+    """When LocalWriteOnlyProfile has no matching setters, RuntimeError is raised.
+
+    This covers the class: 'success flag decoupled from work actually performed'.
+    A LocalWriteOnlyProfile that returns None for every setter_name must not
+    produce a silent applied=True result.
+    """
+    fake = _make_fake_iterm2()
+
+    # Override LocalWriteOnlyProfile to have no setters at all
+    class EmptyProfile:
+        def __getattr__(self, name):
+            return None  # every getter returns None, mimicking missing setters
+
+    fake.LocalWriteOnlyProfile = EmptyProfile
+    monkeypatch.setitem(sys.modules, "iterm2", fake)
+
+    with pytest.raises(RuntimeError, match="set no properties"):
+        apply_preset_to_current_session("dark-glass", timeout=5.0)

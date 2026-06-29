@@ -129,6 +129,22 @@ def test_config_check_cli_missing_file_returns_usage_error(tmp_path, capsys):
     assert "config file not found" in capsys.readouterr().err
 
 
+def test_config_check_no_config_flag_missing_default_returns_0(monkeypatch, capsys):
+    """config-check with no --config and no default file exits 0 with guidance (fresh install)."""
+    import term_chameleon.config as cfg_module
+
+    # Point DEFAULT_CONFIG_PATH at a path that does not exist.
+    monkeypatch.setattr(cfg_module, "DEFAULT_CONFIG_PATH", "/nonexistent/path/config.toml")
+    # Also patch the reference inside commands.checks so the import sees the override.
+    import term_chameleon.commands.checks as checks_module
+
+    monkeypatch.setattr(checks_module, "load_config", cfg_module.load_config)
+
+    assert main(["config-check"]) == 0
+    out = capsys.readouterr().out
+    assert "config-example" in out or "No config file" in out
+
+
 def test_watch_live_uses_config_values(monkeypatch, tmp_path):
     config_path = tmp_path / "config.toml"
     config_path.write_text(

@@ -148,6 +148,11 @@ def watch_live_command(
         command.extend(["--region", region])
     elif iterm_window:
         command.append("--iterm-window")
+    else:
+        # Neither --region nor --iterm-window: pin whole-screen mode explicitly
+        # so the child cannot re-derive the sampling mode from [watch] config,
+        # which may differ from the [daemon] config used by the installer.
+        command.append("--whole-screen")
     return tuple(command)
 
 
