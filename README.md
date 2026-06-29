@@ -93,6 +93,11 @@ It falls back to `screencapture` automatically when unavailable, so the tool wor
 
 ## See it work
 
+![Term Chameleon adapting the live terminal between dark and bright backgrounds](demo/adaptation.gif)
+
+The clip above is a real screen recording of the live session switching between the dark and
+bright readability modes — the same `sample -> decide -> apply` loop the watcher runs.
+
 Quickest look — cycle the presets on your current terminal and watch the colors change:
 
 ```bash
