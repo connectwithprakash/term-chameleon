@@ -1,17 +1,10 @@
 name: Demo
 
-# Regenerate the README demo GIF from demo/demo.tape whenever the tape, the CLI,
-# or the presets change, plus on demand. Keeps the demo from drifting out of date.
+# Manually re-render the README demo GIF from demo/demo.tape and upload it as an
+# artifact to download and commit. Run on demand (Actions tab -> Demo -> Run workflow);
+# it does NOT run on every push, and does NOT auto-commit binaries.
 on:
-  push:
-    branches: [main]
-    paths:
-      - demo/demo.tape
-      - src/term_chameleon/**
   workflow_dispatch:
-
-permissions:
-  contents: write
 
 jobs:
   render:
@@ -21,18 +14,16 @@ jobs:
       - uses: astral-sh/setup-uv@v3
       - name: Install term-chameleon on PATH
         run: uv tool install .
+      - name: Install ffmpeg (vhs dependency)
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
       - name: Render the tape
         uses: charmbracelet/vhs-action@v2
         with:
           path: demo/demo.tape
-      - name: Commit the regenerated demo if it changed
-        run: |
-          if ! git diff --quiet -- demo/demo.gif demo/demo.mp4; then
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add demo/demo.gif demo/demo.mp4
-            git commit -m "chore: regenerate demo from demo/demo.tape"
-            git push
-          else
-            echo "demo unchanged"
-          fi
+      - name: Upload the rendered demo as an artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: demo
+          path: |
+            demo/demo.gif
+            demo/demo.mp4
